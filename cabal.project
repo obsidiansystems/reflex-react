@@ -1,0 +1,6 @@
+packages: .
+allow-newer:
+  void
+constraints:
+  --TODO: This should be pinned in reflex-platform
+  hashable == 1.3.5.0
