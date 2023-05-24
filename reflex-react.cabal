@@ -23,5 +23,7 @@ executable reflex-react
     -- other-extensions:
     build-depends:    base
       , react-haskell
+      , ghcjs-base
+      , ghcjs-dom
     hs-source-dirs:   src-exe
     default-language: Haskell2010
