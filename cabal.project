@@ -16,5 +16,5 @@ constraints:
 
 source-repository-package
   type: git
-  location: https://github.com/obsidiansystems/react-haskell.git
-  tag: 44647cb28ab60872dc47ef1a9d38d02a1edadd61
+  location: https://github.com/obsidiansystems/react-haskell
+  tag: 2144fc940edf36ac3b518e7ff412168f0ab8663f
