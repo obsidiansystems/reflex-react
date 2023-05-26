@@ -11,6 +11,10 @@ packages react-haskell
   build-depends: ghcjs-dom,
                  ghcjs-base
 
+package reflex-dom
+  flags: -webkit2gtk
+
+
 constraints:
   --TODO: This should be pinned in reflex-platform
   --TODO: Make sure to pin both of these
