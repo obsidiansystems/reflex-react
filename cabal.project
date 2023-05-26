@@ -3,7 +3,8 @@ allow-newer:
   react-haskell:void,
   ghcjs-base,
   aeson,
-  attoparsec
+  attoparsec,
+  lens
 
 packages react-haskell
   flags: +ghcjs

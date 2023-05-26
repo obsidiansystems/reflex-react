@@ -15,18 +15,11 @@
         "jsaddle-warp"
       ];
     }
+    ./dep/jsaddle-dom
   ];
   overrides = [
     ({ config, pkgs, lib, ... }: {
-      packages.react-haskell = {
-        flags.ghcjs = true;
-        components.library = {
-          preConfigure = ''
-            sed -i 's/void == 0.7/void/g' "react-haskell.cabal"
-            cat ./react-haskell.cabal
-          '';
-        };
-      };
+
     })
   ];
 })
