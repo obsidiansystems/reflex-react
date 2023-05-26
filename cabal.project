@@ -1,7 +1,9 @@
 packages: .
 allow-newer:
   react-haskell:void,
-  ghcjs-base
+  ghcjs-base,
+  aeson,
+  attoparsec
 
 packages react-haskell
   flags: +ghcjs

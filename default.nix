@@ -8,6 +8,13 @@
   shells = ps: with ps; [ reflex-react ];
   inputThunks = [
     ./dep/react-haskell
+    {
+      thunk = ./dep/jsaddle;
+      subdirs = [
+        "jsaddle"
+        "jsaddle-warp"
+      ];
+    }
   ];
   overrides = [
     ({ config, pkgs, lib, ... }: {
