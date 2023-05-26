@@ -6,7 +6,7 @@
   ghcjs-compiler-nix-name = "ghcjs8107JSString"; #TODO: This must be default
   compiler-nix-name = "ghc8107Splices"; #TODO: This must be default
   shells = ps: with ps; [ reflex-react ];
-  inputMap = [
+  inputThunks = [
     ./dep/react-haskell
   ];
   overrides = [
