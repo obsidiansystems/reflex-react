@@ -1,9 +1,18 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Main where
 
-import Data.Text
+import Data.Text (Text)
+import Language.Javascript.JSaddle.Warp
+import Control.Monad.IO.Class
+import Language.Javascript.JSaddle hiding (Ref)
+import Reflex.Dom
 
 main :: IO ()
-main = putStrLn "Hello, Haskell!"
+main = do
+  let port = 3001 --TODO: Get this from npm config or something
+  run port $ do
+    (global <# "reflex") $ fun $ \_ _ args -> liftIO $ print $ length args
+    liftIO $ putStrLn "jsaddle running"
 
 newtype Hook a = Hook { unHook :: IO a }
   deriving (Functor, Applicative)
