@@ -15,6 +15,13 @@
         "jsaddle-warp"
       ];
     }
+    {
+      thunk = ./dep/reflex-dom;
+      subdirs = [
+        "reflex-dom-core"
+        "reflex-dom"
+      ];
+    }
     ./dep/jsaddle-dom
   ];
   overrides = [
