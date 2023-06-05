@@ -1,27 +1,79 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ApplicativeDo #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 module Main where
 
 import Data.Text (Text)
+import qualified Data.Text as T
 import Language.Javascript.JSaddle.Warp
-import Control.Monad.IO.Class
 import Language.Javascript.JSaddle hiding (Ref)
-import Reflex.Dom
+--import Reflex.Dom.Main
+import Reflex.Dom.Core
+--import Reflex
+import Control.Monad.IO.Class
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Control.Monad
+
+t :: Text -> Text
+t = id
+
+tshow :: Show a => a -> Text
+tshow = T.pack . show
 
 main :: IO ()
 main = do
   let port = 3001 --TODO: Get this from npm config or something
-  run port $ do
-    (global <# "reflex") $ fun $ \_ _ args -> liftIO $ print $ length args
-    liftIO $ putStrLn "jsaddle running"
+  run port $ \arg -> do
+    liftIO $ putStrLn "done"
+    comp <- component $ do
+      pure $ \myProps -> Render $ do
+        myPropsJson <- valToJSON myProps
+        liftIO $ putStrLn $ show myPropsJson
+        props <- obj
+        (props <# t "children") $ myPropsJson
+        result <- (arg # t "jsx") (t "strong", props)
+        ((global ! t "console") # t "log") result
+        pure result
+    _ <- (arg # t "setVal") ["comp" =: pToJSVal comp :: Map Text JSVal]
+    pure ()
 
-newtype Hook a = Hook { unHook :: IO a }
+instance ToJSVal v => ToJSVal (Map Text v) where
+  toJSVal m = do
+    o@(Object oVal) <- obj
+    forM_ (Map.toList m) $ \(k, v) -> do
+      (o <# k) =<< toJSVal v
+    pure oVal
+
+instance ToJSVal (Component props refVal) where
+  toJSVal (Component f) = toJSVal f
+
+instance PToJSVal (Component props refVal) where
+  pToJSVal (Component f) = pToJSVal f
+
+instance PToJSVal Function where
+  pToJSVal (Function _ o) = pToJSVal o
+
+instance PToJSVal Object where
+  pToJSVal (Object v) = v
+
+newtype Hook a = Hook { unHook :: JSM a }
   deriving (Functor, Applicative)
 
-data Component props refVal
+newtype Component props refVal = Component { unComponent :: Function }
 
 --TODO: The Hook section shouldn't have any control flow to it; probably it also shouldn't depend on props except in specific ways
-component :: (props -> Hook (Render ())) -> Component props ()
-component = undefined
+component :: Hook (JSVal -> Render JSVal) -> JSM (Component JSVal ())
+component (Hook hook) = do
+  (callbackId, jsVal) <- newSyncCallback'' $ \_ _ args -> do
+    render <- hook
+    let props = case args of
+          [] -> jsUndefined
+          arg0 : _ -> arg0
+    unRender $ render props
+  pure $ Component $ Function callbackId (Object jsVal)
 
 --TODO: Input can be an initializer function rather than value
 --TODO: JSVal
@@ -86,8 +138,8 @@ useId = undefined
 useSyncExternalStore :: (IO () -> IO (IO ())) -> IO a -> Maybe (IO a) -> Hook ()
 useSyncExternalStore = undefined
 
-newtype Render a = Render { unRender :: IO a }
+newtype Render a = Render { unRender :: JSM a }
   deriving (Functor, Applicative, Monad)
 
-newtype Effect a = Effect { unEffect :: IO a }
+newtype Effect a = Effect { unEffect :: JSM a }
   deriving (Functor, Applicative, Monad)

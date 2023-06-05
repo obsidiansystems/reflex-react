@@ -28,5 +28,7 @@ executable reflex-react
                     , text
                     , jsaddle-warp
                     , reflex-dom-core
+                    , reflex
+                    , containers
     hs-source-dirs:   src-exe
     default-language: Haskell2010
