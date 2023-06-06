@@ -16,6 +16,7 @@ import Control.Monad.IO.Class
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad
+import Control.Monad.Reader
 
 t :: Text -> Text
 t = id
@@ -28,15 +29,12 @@ main = do
   let port = 3001 --TODO: Get this from npm config or something
   run port $ \arg -> do
     liftIO $ putStrLn "done"
-    comp <- component $ do
+    react <- fmap (React . Object) $ arg ! t "react"
+    comp <- flip runReaderT react $ component $ do
       pure $ \myProps -> Render $ do
-        myPropsJson <- valToJSON myProps
-        liftIO $ putStrLn $ show myPropsJson
-        props <- obj
-        (props <# t "children") $ myPropsJson
-        result <- (arg # t "jsx") (t "strong", props)
-        ((global ! t "console") # t "log") result
-        pure result
+        myPropsJson <- lift $ valToJSON myProps
+        props <- lift obj
+        createElement "strong" props [toJSVal (t "Props: "), toJSVal myPropsJson]
     _ <- (arg # t "setVal") ["comp" =: pToJSVal comp :: Map Text JSVal]
     pure ()
 
@@ -59,15 +57,27 @@ instance PToJSVal Function where
 instance PToJSVal Object where
   pToJSVal (Object v) = v
 
-newtype Hook a = Hook { unHook :: JSM a }
+newtype Hook a = Hook { unHook :: ReaderT React JSM a }
   deriving (Functor, Applicative)
 
 newtype Component props refVal = Component { unComponent :: Function }
 
+-- | An object that contains the React library
+newtype React = React { unReact :: Object }
+
+instance MakeObject React where
+  makeObject = pure . unReact
+
+createElement :: Text -> Object -> [JSM JSVal] -> ReaderT React JSM JSVal
+createElement etag props children = do
+  react <- ask
+  lift $ react # t "createElement" $ (etag, props, children)
+
 --TODO: The Hook section shouldn't have any control flow to it; probably it also shouldn't depend on props except in specific ways
-component :: Hook (JSVal -> Render JSVal) -> JSM (Component JSVal ())
+component :: Hook (JSVal -> Render JSVal) -> ReaderT React JSM (Component JSVal ())
 component (Hook hook) = do
-  (callbackId, jsVal) <- newSyncCallback'' $ \_ _ args -> do
+  react <- ask
+  (callbackId, jsVal) <- lift $ newSyncCallback'' $ \_ _ args -> flip runReaderT react $ do
     render <- hook
     let props = case args of
           [] -> jsUndefined
@@ -138,7 +148,7 @@ useId = undefined
 useSyncExternalStore :: (IO () -> IO (IO ())) -> IO a -> Maybe (IO a) -> Hook ()
 useSyncExternalStore = undefined
 
-newtype Render a = Render { unRender :: JSM a }
+newtype Render a = Render { unRender :: ReaderT React JSM a }
   deriving (Functor, Applicative, Monad)
 
 newtype Effect a = Effect { unEffect :: JSM a }
