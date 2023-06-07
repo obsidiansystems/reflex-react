@@ -34,13 +34,11 @@ main = do
   run port $ \arg -> do
     react <- fmap (React . Object) $ arg ! t "react"
     comp <- flip runReaderT react $ component $ do
-      v0 <- Hook $ lift $ toJSVal (12345 :: Int)
-      (_, _) <- useState v0
+      _ <- Hook $ lift $ (global ! t "console") # t "log" $ [t ""]
       pure $ \myProps -> Render $ do
         myPropsJson <- lift $ valToJSON myProps
-        props <- lift obj
-        createElement "strong" props [toJSVal (t "Props: "), toJSVal myPropsJson, toJSVal (t "; State: "), pure v0]
-    _ <- (arg # t "setVal") ["comp" =: pToJSVal comp :: Map Text JSVal]
+        lift $ (global ! t "console") # t "log" $ [toJSVal myPropsJson]
+    call comp arg [t "test"]
     pure ()
 
 instance ToJSVal v => ToJSVal (Map Text v) where
@@ -72,6 +70,9 @@ newtype React = React { unReact :: Object }
 
 instance MakeObject React where
   makeObject = pure . unReact
+
+instance MakeObject (Component props refVal) where
+  makeObject = makeObject . functionObject . unComponent
 
 createElement :: Text -> Object -> [JSM JSVal] -> ReaderT React JSM JSVal
 createElement etag props children = do
