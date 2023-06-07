@@ -5,6 +5,8 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 module Main where
 
+import Prelude hiding ((!!))
+
 import Data.Text (Text)
 import qualified Data.Text as T
 import Language.Javascript.JSaddle.Warp
@@ -17,6 +19,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad
 import Control.Monad.Reader
+import System.IO
 
 t :: Text -> Text
 t = id
@@ -26,15 +29,17 @@ tshow = T.pack . show
 
 main :: IO ()
 main = do
+  hSetBuffering stdout LineBuffering
   let port = 3001 --TODO: Get this from npm config or something
   run port $ \arg -> do
-    liftIO $ putStrLn "done"
     react <- fmap (React . Object) $ arg ! t "react"
     comp <- flip runReaderT react $ component $ do
+      v0 <- Hook $ lift $ toJSVal (12345 :: Int)
+      (_, _) <- useState v0
       pure $ \myProps -> Render $ do
         myPropsJson <- lift $ valToJSON myProps
         props <- lift obj
-        createElement "strong" props [toJSVal (t "Props: "), toJSVal myPropsJson]
+        createElement "strong" props [toJSVal (t "Props: "), toJSVal myPropsJson, toJSVal (t "; State: "), pure v0]
     _ <- (arg # t "setVal") ["comp" =: pToJSVal comp :: Map Text JSVal]
     pure ()
 
@@ -58,7 +63,7 @@ instance PToJSVal Object where
   pToJSVal (Object v) = v
 
 newtype Hook a = Hook { unHook :: ReaderT React JSM a }
-  deriving (Functor, Applicative)
+  deriving (Functor, Applicative, Monad)
 
 newtype Component props refVal = Component { unComponent :: Function }
 
@@ -87,9 +92,15 @@ component (Hook hook) = do
 
 --TODO: Input can be an initializer function rather than value
 --TODO: JSVal
-useState :: a -> Hook (a, SetFunction a)
-useState = undefined
-
+useState :: JSVal -> Hook (JSVal, JSVal)
+useState _initialValue = Hook $ do
+  react <- ask
+  _result <- lift $ (react # t "useState") jsUndefined
+  pure (jsUndefined, jsUndefined) {-
+  s <- lift $ result !! 0
+  setter <- lift $ result !! 1
+  pure (s, setter)
+--}
 --TODO: Can be called during rendering https://react.dev/reference/react/useState#storing-information-from-previous-renders but "shouldn't" generally
 type SetFunction a = Either a (a -> a) -> Effect ()
 
