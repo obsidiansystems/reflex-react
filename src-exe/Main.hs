@@ -9,6 +9,7 @@ import Prelude hiding ((!!))
 
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import Language.Javascript.JSaddle.Warp
 import Language.Javascript.JSaddle hiding (Ref)
 --import Reflex.Dom.Main
@@ -18,6 +19,7 @@ import Control.Monad.IO.Class
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad
+import Control.Monad.Except
 import Control.Monad.Reader
 import System.IO
 
@@ -27,18 +29,23 @@ t = id
 tshow :: Show a => a -> Text
 tshow = T.pack . show
 
+printJavaScriptException :: JavaScriptException -> JSM ()
+printJavaScriptException (JavaScriptException e) = do
+  s <- e # t "toString" $ ()
+  j <- valToJSON s
+  liftIO $ T.putStrLn $ "Exception: " <> tshow j
+
 main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
   let port = 3001 --TODO: Get this from npm config or something
-  run port $ \arg -> do
-    react <- fmap (React . Object) $ arg ! t "react"
-    comp <- flip runReaderT react $ component $ do
-      _ <- Hook $ lift $ (global ! t "console") # t "log" $ [t ""]
-      pure $ \myProps -> Render $ do
-        myPropsJson <- lift $ valToJSON myProps
-        lift $ (global ! t "console") # t "log" $ [toJSVal myPropsJson]
-    call comp arg [t "test"]
+  run port $ \arg -> (`catchError` printJavaScriptException) $ do
+    (callbackId, jsVal) <- newSyncCallback'' $ \_ _ [arg] -> do
+      _ <- (global ! t "console") # t "log" $ [t "Starting Test"]
+      myPropsJson <- valToJSON arg
+      (global ! t "console") # t "log" $ [toJSVal myPropsJson]
+    o <- obj
+    call (Object jsVal) arg [o]
     pure ()
 
 instance ToJSVal v => ToJSVal (Map Text v) where

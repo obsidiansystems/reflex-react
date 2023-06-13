@@ -19,17 +19,78 @@ common warnings
 executable reflex-react
     import:           warnings
     main-is:          Main.hs
-    -- other-modules:
+    other-modules:
+        Data.JSString.Internal.Type
+        Data.JSString.Text
+        GHCJS.Foreign.Internal
+        GHCJS.Internal.Types
+        GHCJS.Marshal
+        GHCJS.Marshal.Internal
+        GHCJS.Marshal.Pure
+        GHCJS.Prim
+        GHCJS.Prim.Internal
+        GHCJS.Types
+        JavaScript.Array
+        JavaScript.Array.Internal
+        JavaScript.Object.Internal
+        Language.Javascript.JSaddle
+        Language.Javascript.JSaddle.Arguments
+        Language.Javascript.JSaddle.Classes
+        Language.Javascript.JSaddle.Classes.Internal
+        Language.Javascript.JSaddle.Debug
+        Language.Javascript.JSaddle.Evaluate
+        Language.Javascript.JSaddle.Marshal.String
+        Language.Javascript.JSaddle.Monad
+        Language.Javascript.JSaddle.Native
+        Language.Javascript.JSaddle.Native.Internal
+        Language.Javascript.JSaddle.Object
+        Language.Javascript.JSaddle.Properties
+        Language.Javascript.JSaddle.Run
+        Language.Javascript.JSaddle.Run.Files
+        Language.Javascript.JSaddle.String
+        Language.Javascript.JSaddle.Types
+        Language.Javascript.JSaddle.Value
+        Language.Javascript.JSaddle.Warp
+        Language.Javascript.JSaddle.Warp.Debug
+        Language.Javascript.JSaddle.WebSockets
+        Language.Javascript.JSaddle.WebSockets.Compat
     -- other-extensions:
     build-depends:    base
-                    , jsaddle
-                    , jsaddle-dom
-                    , ghcjs-dom
                     , text
-                    , jsaddle-warp
                     , reflex-dom-core
                     , reflex
                     , containers
                     , mtl
-    hs-source-dirs:   src-exe
+--                    , jsaddle
+--                    , jsaddle-dom
+--                    , jsaddle-warp
+--                    , ghcjs-dom
+                    , websockets
+                    , deepseq
+                    , aeson
+                    , scientific
+                    , bytestring
+                    , stm
+                    , ref-tf
+                    , transformers
+                    , unliftio-core
+                    , exceptions
+                    , async
+                    , primitive
+                    , lens
+                    , ghc-prim
+                    , http-types
+                    , entropy
+                    , base64-bytestring
+                    , wai
+                    , wai-websockets
+                    , warp
+                    , foreign-store
+    hs-source-dirs:
+      src-exe
+      dep/jsaddle/jsaddle/src
+      dep/jsaddle/jsaddle/src-ghc
+      dep/jsaddle/jsaddle-warp/src
+      dep/jsaddle/jsaddle-dom/src
     default-language: Haskell2010
+    ghc-options: -threaded -with-rtsopts=-N10
