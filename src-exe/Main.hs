@@ -53,19 +53,18 @@ main = do
     (global <# t "react") $ unReact react
     consoleLog $ unReact react
     comp <- flip runReaderT react $ component $ do
-      v0 <- Hook $ lift $ toJSVal (12345 :: Int)
-      (v, setV) <- useState v0
+      (v, setV) <- useState (12345 :: Int)
       pure $ \myProps -> Render $ do
         myPropsJson <- lift $ valToJSON myProps
         strongProps <- lift $ fmap Object $ toJSVal $ ("key" =: "1" :: Map Text JSVal)
-        (_, onButton) <- lift $ newSyncCallback'' $ \_ _ args -> flip runReaderT react $ do
+        (_, onButton) <- lift $ newSyncCallback'' $ \_ _ _ -> flip runReaderT react $ do
           lift $ call setV nullObject (primToJSVal $ PrimVal_Number 5)
         buttonProps <- lift $ fmap Object $ toJSVal $ mconcat @(Map Text JSVal)
           [ "key" =: "2"
           , "onClick" =: onButton
           ]
         fragment =<< sequence
-          [ createElement "strong" strongProps =<< lift (sequence [toJSVal (t "Props: "), toJSVal myPropsJson, toJSVal (t "; State: "), pure v])
+          [ createElement "strong" strongProps =<< lift (sequence [toJSVal (t "Props: "), toJSVal myPropsJson, toJSVal (t "; State: "), toJSVal v])
           , createElement "button" buttonProps ["Test"]
           ]
     _ <- (arg # t "setVal") ["comp" =: pToJSVal comp :: Map Text JSVal]
@@ -78,6 +77,7 @@ instance ToJSVal v => ToJSVal (Map Text v) where
       (o <# k) =<< toJSVal v
     pure oVal
 
+consoleLog :: ToJSVal a => a -> JSM JSVal
 consoleLog x = (global ! t "console") # t "log" $ [x]
 
 instance ToJSVal (Component props refVal) where
@@ -114,9 +114,9 @@ createElement etag props children = do
 fragment :: [JSVal] -> ReaderT React JSM JSVal
 fragment children = do
   react <- ask
-  fragment <- lift $ react ! t "Fragment"
+  fragmentTag <- lift $ react ! t "Fragment"
   empty <- lift obj
-  createElement fragment empty children
+  createElement fragmentTag empty children
 
 --TODO: The Hook section shouldn't have any control flow to it; probably it also shouldn't depend on props except in specific ways
 component :: Hook (JSVal -> Render JSVal) -> ReaderT React JSM (Component JSVal ())
@@ -132,11 +132,12 @@ component (Hook hook) = do
 
 --TODO: Input can be an initializer function rather than value
 --TODO: JSVal
-useState :: JSVal -> Hook (JSVal, JSVal)
+useState :: (ToJSVal a, FromJSVal a) => a -> Hook (a, JSVal)
 useState initialValue = Hook $ do
   react <- ask
-  result <- lift $ (react # t "useState") initialValue
-  s <- lift $ result !! 0
+  initialJSVal <- lift $ toJSVal initialValue
+  result <- lift $ (react # t "useState") initialJSVal
+  Just s <- lift $ fromJSVal =<< result !! 0 --TODO: Exception handling
   setter <- lift $ result !! 1
   pure (s, setter)
 
