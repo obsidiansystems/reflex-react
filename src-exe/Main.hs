@@ -14,7 +14,7 @@ import qualified Data.Text.IO as T
 import Language.Javascript.JSaddle.Warp
 import Language.Javascript.JSaddle hiding (Ref)
 --import Reflex.Dom.Main
-import Reflex.Dom.Core
+import Reflex.Dom.Core ((=:))
 --import Reflex
 import Control.Monad.IO.Class
 import Data.Map (Map)
@@ -55,17 +55,17 @@ main = do
     comp <- flip runReaderT react $ component $ do
       (v, setV) <- useState (0 :: Int)
       pure $ \myProps -> Render $ do
-        myPropsJson <- lift $ valToJSON myProps
+        myPropsJson <- lift $ fromJSString <$> valToJSON myProps
         strongProps <- lift $ fmap Object $ toJSVal $ ("key" =: "1" :: Map Text JSVal)
         (_, onButton) <- lift $ newSyncCallback'' $ \_ _ _ -> flip runReaderT react $ do
           lift $ setV $ v + 1
           pure jsUndefined
-        buttonProps <- lift $ fmap Object $ toJSVal $ mconcat @(Map Text JSVal)
-          [ "key" =: "2"
-          , "onClick" =: onButton
-          ]
-        fragment =<< sequence
-          [ createElement "strong" strongProps =<< lift (sequence [toJSVal (t "Props: "), toJSVal myPropsJson, toJSVal (t "; State: "), toJSVal v])
+        let buttonProps = mconcat
+              [ "key" =: "2"
+              , "onClick" =: onButton
+              ]
+        pure $ fragment
+          [ createElement "strong" ("key" =: "1") ["Props: ", fromString myPropsJson, "; State: ", fromString $ show v]
           , createElement "button" buttonProps ["Test"]
           ]
     _ <- (arg # t "setVal") ["comp" =: pToJSVal comp :: Map Text JSVal]
@@ -107,20 +107,25 @@ instance MakeObject React where
 instance MakeObject (Component props refVal) where
   makeObject = makeObject . functionObject . unComponent
 
-createElement :: JSVal -> Object -> [JSVal] -> ReaderT React JSM JSVal
-createElement etag props children = do
-  react <- ask
-  lift $ react # t "createElement" $ (etag, props, children)
+newtype Element = Element { unElement :: ReaderT React JSM JSVal }
 
-fragment :: [JSVal] -> ReaderT React JSM JSVal
-fragment children = do
+instance IsString Element where
+  fromString = Element . pure . pToJSVal . T.pack
+
+createElement :: JSVal -> Map Text JSVal -> [Element] -> Element
+createElement etag props children = Element $ do
+  react <- ask
+  createdChildren <- mapM unElement children
+  lift $ react # t "createElement" $ (etag, props, createdChildren)
+
+fragment :: [Element] -> Element
+fragment children = Element $ do
   react <- ask
   fragmentTag <- lift $ react ! t "Fragment"
-  empty <- lift obj
-  createElement fragmentTag empty children
+  unElement $ createElement fragmentTag mempty children
 
 --TODO: The Hook section shouldn't have any control flow to it; probably it also shouldn't depend on props except in specific ways
-component :: Hook (JSVal -> Render JSVal) -> ReaderT React JSM (Component JSVal ())
+component :: Hook (JSVal -> Render Element) -> ReaderT React JSM (Component JSVal ())
 component (Hook hook) = do
   react <- ask
   (callbackId, jsVal) <- lift $ newSyncCallback'' $ \_ _ args -> flip runReaderT react $ do
@@ -128,7 +133,8 @@ component (Hook hook) = do
     let props = case args of
           [] -> jsUndefined
           arg0 : _ -> arg0
-    unRender $ render props
+    e <- unRender $ render props
+    unElement e
   pure $ Component $ Function callbackId (Object jsVal)
 
 --TODO: Input can be an initializer function rather than value
