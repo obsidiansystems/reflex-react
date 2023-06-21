@@ -53,12 +53,13 @@ main = do
     (global <# t "react") $ unReact react
     consoleLog $ unReact react
     comp <- flip runReaderT react $ component $ do
-      (v, setV) <- useState (12345 :: Int)
+      (v, setV) <- useState (0 :: Int)
       pure $ \myProps -> Render $ do
         myPropsJson <- lift $ valToJSON myProps
         strongProps <- lift $ fmap Object $ toJSVal $ ("key" =: "1" :: Map Text JSVal)
         (_, onButton) <- lift $ newSyncCallback'' $ \_ _ _ -> flip runReaderT react $ do
-          lift $ call setV nullObject (primToJSVal $ PrimVal_Number 5)
+          lift $ setV $ v + 1
+          pure jsUndefined
         buttonProps <- lift $ fmap Object $ toJSVal $ mconcat @(Map Text JSVal)
           [ "key" =: "2"
           , "onClick" =: onButton
@@ -132,14 +133,18 @@ component (Hook hook) = do
 
 --TODO: Input can be an initializer function rather than value
 --TODO: JSVal
-useState :: (ToJSVal a, FromJSVal a) => a -> Hook (a, JSVal)
+--TODO: `set` can take `a -> a` instead of `a`
+useState :: (ToJSVal a, FromJSVal a) => a -> Hook (a, a -> JSM ())
 useState initialValue = Hook $ do
   react <- ask
   initialJSVal <- lift $ toJSVal initialValue
   result <- lift $ (react # t "useState") initialJSVal
   Just s <- lift $ fromJSVal =<< result !! 0 --TODO: Exception handling
   setter <- lift $ result !! 1
-  pure (s, setter)
+  pure
+    ( s
+    , \v' -> void $ call setter nullObject [v']
+    )
 
 --TODO: Can be called during rendering https://react.dev/reference/react/useState#storing-information-from-previous-renders but "shouldn't" generally
 type SetFunction a = Either a (a -> a) -> Effect ()
