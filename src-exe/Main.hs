@@ -112,16 +112,21 @@ newtype Element = Element { unElement :: ReaderT React JSM JSVal }
 instance IsString Element where
   fromString = Element . pure . pToJSVal . T.pack
 
-createElement :: JSVal -> Map Text JSVal -> [Element] -> Element
+newtype Tag = Tag { unTag :: JSVal }
+
+instance IsString Tag where
+  fromString = Tag . pToJSVal . T.pack
+
+createElement :: Tag -> Map Text JSVal -> [Element] -> Element
 createElement etag props children = Element $ do
   react <- ask
   createdChildren <- mapM unElement children
-  lift $ react # t "createElement" $ (etag, props, createdChildren)
+  lift $ react # t "createElement" $ (unTag etag, props, createdChildren)
 
 fragment :: [Element] -> Element
 fragment children = Element $ do
   react <- ask
-  fragmentTag <- lift $ react ! t "Fragment"
+  fragmentTag <- lift $ fmap Tag $ react ! t "Fragment"
   unElement $ createElement fragmentTag mempty children
 
 --TODO: The Hook section shouldn't have any control flow to it; probably it also shouldn't depend on props except in specific ways
