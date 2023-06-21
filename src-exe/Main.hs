@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 module Main where
 
@@ -22,6 +23,8 @@ import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader
 import System.IO
+import GHCJS.Prim.Internal (primToJSVal)
+import Data.String
 
 t :: Text -> Text
 t = id
@@ -35,17 +38,37 @@ printJavaScriptException (JavaScriptException e) = do
   j <- valToJSON s
   liftIO $ T.putStrLn $ "Exception: " <> tshow j
 
+instance PToJSVal Text where
+  pToJSVal s = primToJSVal $ PrimVal_String s
+
+instance IsString JSVal where
+  fromString = pToJSVal . T.pack
+
 main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
   let port = 3001 --TODO: Get this from npm config or something
   run port $ \arg -> (`catchError` printJavaScriptException) $ do
-    (callbackId, jsVal) <- newSyncCallback'' $ \_ _ [arg] -> do
-      _ <- (global ! t "console") # t "log" $ [t "Starting Test"]
-      myPropsJson <- valToJSON arg
-      (global ! t "console") # t "log" $ [toJSVal myPropsJson]
-    o <- obj
-    call (Object jsVal) arg [o]
+    react <- fmap (React . Object) $ arg ! t "react"
+    (global <# t "react") $ unReact react
+    consoleLog $ unReact react
+    comp <- flip runReaderT react $ component $ do
+      v0 <- Hook $ lift $ toJSVal (12345 :: Int)
+      (v, setV) <- useState v0
+      pure $ \myProps -> Render $ do
+        myPropsJson <- lift $ valToJSON myProps
+        strongProps <- lift $ fmap Object $ toJSVal $ ("key" =: "1" :: Map Text JSVal)
+        (_, onButton) <- lift $ newSyncCallback'' $ \_ _ args -> flip runReaderT react $ do
+          lift $ call setV nullObject (primToJSVal $ PrimVal_Number 5)
+        buttonProps <- lift $ fmap Object $ toJSVal $ mconcat @(Map Text JSVal)
+          [ "key" =: "2"
+          , "onClick" =: onButton
+          ]
+        fragment =<< sequence
+          [ createElement "strong" strongProps =<< lift (sequence [toJSVal (t "Props: "), toJSVal myPropsJson, toJSVal (t "; State: "), pure v])
+          , createElement "button" buttonProps ["Test"]
+          ]
+    _ <- (arg # t "setVal") ["comp" =: pToJSVal comp :: Map Text JSVal]
     pure ()
 
 instance ToJSVal v => ToJSVal (Map Text v) where
@@ -54,6 +77,8 @@ instance ToJSVal v => ToJSVal (Map Text v) where
     forM_ (Map.toList m) $ \(k, v) -> do
       (o <# k) =<< toJSVal v
     pure oVal
+
+consoleLog x = (global ! t "console") # t "log" $ [x]
 
 instance ToJSVal (Component props refVal) where
   toJSVal (Component f) = toJSVal f
@@ -81,10 +106,17 @@ instance MakeObject React where
 instance MakeObject (Component props refVal) where
   makeObject = makeObject . functionObject . unComponent
 
-createElement :: Text -> Object -> [JSM JSVal] -> ReaderT React JSM JSVal
+createElement :: JSVal -> Object -> [JSVal] -> ReaderT React JSM JSVal
 createElement etag props children = do
   react <- ask
   lift $ react # t "createElement" $ (etag, props, children)
+
+fragment :: [JSVal] -> ReaderT React JSM JSVal
+fragment children = do
+  react <- ask
+  fragment <- lift $ react ! t "Fragment"
+  empty <- lift obj
+  createElement fragment empty children
 
 --TODO: The Hook section shouldn't have any control flow to it; probably it also shouldn't depend on props except in specific ways
 component :: Hook (JSVal -> Render JSVal) -> ReaderT React JSM (Component JSVal ())
@@ -101,14 +133,13 @@ component (Hook hook) = do
 --TODO: Input can be an initializer function rather than value
 --TODO: JSVal
 useState :: JSVal -> Hook (JSVal, JSVal)
-useState _initialValue = Hook $ do
+useState initialValue = Hook $ do
   react <- ask
-  _result <- lift $ (react # t "useState") jsUndefined
-  pure (jsUndefined, jsUndefined) {-
+  result <- lift $ (react # t "useState") initialValue
   s <- lift $ result !! 0
   setter <- lift $ result !! 1
   pure (s, setter)
---}
+
 --TODO: Can be called during rendering https://react.dev/reference/react/useState#storing-information-from-previous-renders but "shouldn't" generally
 type SetFunction a = Either a (a -> a) -> Effect ()
 
