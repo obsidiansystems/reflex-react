@@ -1,6 +1,6 @@
 {
   reflex-platform ? import ./dep/reflex-platform { system = builtins.currentSystem; }
-}: reflex-platform.project ({ pkgs, thunkSource, ... }: {
+}: (reflex-platform.project ({ pkgs, thunkSource, ... }: {
   name = "reflex-react";
   src = ./.;
   ghcjs-compiler-nix-name = "ghcjs8107JSString"; #TODO: This must be default
@@ -29,4 +29,11 @@
 
     })
   ];
+})).extend (self: super: {
+  shells = super.shells // {
+     ghc = self.shell-driver {
+       crossBuilds = [ ];
+       buildInputs = with self.pkgs; [ nodejs ];
+     };
+  };
 })
