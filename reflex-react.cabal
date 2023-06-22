@@ -1,56 +1,56 @@
 cabal-version:      3.0
 name:               reflex-react
 version:            0.1.0.0
--- synopsis:
--- description:
 license:            BSD-3-Clause
 license-file:       LICENSE
 author:             Obsidian Systems LLC
 maintainer:         maintainer@obsidian.systems
--- copyright:
 category:           Web
 build-type:         Simple
 extra-doc-files:    CHANGELOG.md
--- extra-source-files:
 
 common warnings
     ghc-options: -Wall
 
 executable reflex-react
-    import:           warnings
-    main-is:          Main.hs
-    build-depends:    base
-                    , text
-                    , reflex-dom-core
-                    , reflex
-                    , containers
-                    , mtl
-                    , jsaddle
-                    , jsaddle-dom
-                    , jsaddle-warp
-                    , ghcjs-dom
-                    , websockets
-                    , deepseq
-                    , aeson
-                    , scientific
-                    , bytestring
-                    , stm
-                    , ref-tf
-                    , transformers
-                    , unliftio-core
-                    , exceptions
-                    , async
-                    , primitive
-                    , lens
-                    , ghc-prim
-                    , http-types
-                    , entropy
-                    , base64-bytestring
-                    , wai
-                    , wai-websockets
-                    , warp
-                    , foreign-store
-    hs-source-dirs:
-      src-exe
-    default-language: Haskell2010
-    ghc-options: -threaded -with-rtsopts=-N10
+  import:           warnings
+  main-is:          Main.hs
+  other-modules:
+    React
+  build-depends:    base
+--                  , reflex-react --TODO: Split into a library
+                  , text
+                  , reflex-dom-core
+                  , reflex
+                  , containers
+                  , mtl
+                  , jsaddle
+                  , jsaddle-dom
+                  , jsaddle-warp
+                  , ghcjs-dom
+                  , websockets
+                  , deepseq
+                  , aeson
+                  , scientific
+                  , bytestring
+                  , stm
+                  , ref-tf
+                  , transformers
+                  , unliftio-core
+                  , exceptions
+                  , async
+                  , primitive
+                  , lens
+                  , ghc-prim
+                  , http-types
+                  , entropy
+                  , base64-bytestring
+                  , wai
+                  , wai-websockets
+                  , warp
+                  , foreign-store
+  hs-source-dirs:
+    src
+    src-exe
+  default-language: Haskell2010
+  ghc-options: -threaded -with-rtsopts=-N10
