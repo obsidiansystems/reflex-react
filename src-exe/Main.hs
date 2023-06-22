@@ -56,16 +56,14 @@ main = do
       (v, setV) <- useState (0 :: Int)
       pure $ \myProps -> Render $ do
         myPropsJson <- lift $ fromJSString <$> valToJSON myProps
-        strongProps <- lift $ fmap Object $ toJSVal $ ("key" =: "1" :: Map Text JSVal)
         (_, onButton) <- lift $ newSyncCallback'' $ \_ _ _ -> flip runReaderT react $ do
           lift $ setV $ v + 1
           pure jsUndefined
         let buttonProps = mconcat
-              [ "key" =: "2"
-              , "onClick" =: onButton
+              [ "onClick" =: onButton
               ]
         pure $ fragment
-          [ createElement "strong" ("key" =: "1") ["Props: ", fromString myPropsJson, "; State: ", fromString $ show v]
+          [ createElement "strong" mempty ["Props: ", fromString myPropsJson, "; State: ", fromString $ show v]
           , createElement "button" buttonProps ["Test"]
           ]
     _ <- (arg # t "setVal") ["comp" =: pToJSVal comp :: Map Text JSVal]
@@ -121,7 +119,7 @@ createElement :: Tag -> Map Text JSVal -> [Element] -> Element
 createElement etag props children = Element $ do
   react <- ask
   createdChildren <- mapM unElement children
-  lift $ react # t "createElement" $ (unTag etag, props, createdChildren)
+  lift $ react # t "createElement" $ [pure $ unTag etag, toJSVal props] <> fmap pure createdChildren
 
 fragment :: [Element] -> Element
 fragment children = Element $ do
