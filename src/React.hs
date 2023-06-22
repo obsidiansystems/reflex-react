@@ -146,27 +146,47 @@ createContext = undefined
 provider :: Context a -> a -> Render b -> Render b
 provider = undefined
 
-useRef :: a -> Hook (Ref a)
-useRef = undefined
+useRef :: JSVal -> Hook JSVal
+useRef initialValue = Hook $ do
+  react <- ask
+  lift $ (react # t "useRef") initialValue
 
 data Ref a
 
 forwardRef :: (props -> Ref refVal -> Hook (Render ())) -> Component props refVal
 forwardRef = undefined
 
-useImperativeHandle :: Ref a -> Effect a -> Maybe [Dep] -> Hook ()
+useImperativeHandle :: Ref a -> Effect a -> Maybe [JSVal] -> Hook ()
 useImperativeHandle = undefined
 
-data Dep
+useEffect :: (JSVal -> JSVal -> [JSVal] -> JSM JSVal) -> Maybe [JSVal] -> Hook ()
+useEffect f deps = Hook $ do
+  react <- ask
+  --TODO: Garbage collect this callback.  It will be getting created every time this function re-renders, even if React decides not to use the new version.
+  (_, cb) <- lift $ newSyncCallback'' f
+  depsArg <- case deps of
+    Nothing -> pure []
+    Just someDeps -> do
+      depsArray <- lift $ toJSVal someDeps
+      pure [depsArray]
+  _ <- lift $ (react # t "useEffect") $ [cb] <> depsArg
+  pure ()
 
-useEffect :: IO (IO ()) -> Maybe [Dep] -> Hook ()
-useEffect = undefined
 
-useMemo :: a -> Maybe [Dep] -> Hook ()
+useMemo :: a -> Maybe [JSVal] -> Hook ()
 useMemo = undefined
 
-useCallback :: a -> Maybe [Dep] -> Hook ()
-useCallback = useMemo --TODO: Is there actually any difference?
+useCallback :: (JSVal -> JSVal -> [JSVal] -> JSM JSVal) -> Maybe [JSVal] -> Hook JSVal
+useCallback f deps = Hook $ do
+  react <- ask
+  --TODO: Garbage collect this callback.  It will be getting created every time this function re-renders, even if React decides not to use the new version.
+  (_, cb) <- lift $ newSyncCallback'' f
+  depsArg <- case deps of
+    Nothing -> pure []
+    Just someDeps -> do
+      depsArray <- lift $ toJSVal someDeps
+      pure [depsArray]
+  lift $ (react # t "useCallback") $ [cb] <> depsArg
 
 useTransition :: Hook (Bool, Effect () -> Effect ())
 useTransition = undefined

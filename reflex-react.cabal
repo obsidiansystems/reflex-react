@@ -17,17 +17,51 @@ executable reflex-react
   main-is:          Main.hs
   other-modules:
     React
+--    Data.JSString.Internal.Type
+--    Data.JSString.Text
+--    GHCJS.Foreign.Internal
+--    GHCJS.Internal.Types
+--    GHCJS.Marshal
+--    GHCJS.Marshal.Internal
+--    GHCJS.Marshal.Pure
+--    GHCJS.Prim
+--    GHCJS.Prim.Internal
+--    GHCJS.Types
+--    JavaScript.Array
+--    JavaScript.Array.Internal
+--    JavaScript.Object.Internal
+--    Language.Javascript.JSaddle
+--    Language.Javascript.JSaddle.Arguments
+--    Language.Javascript.JSaddle.Classes
+--    Language.Javascript.JSaddle.Classes.Internal
+--    Language.Javascript.JSaddle.Debug
+--    Language.Javascript.JSaddle.Evaluate
+--    Language.Javascript.JSaddle.Marshal.String
+--    Language.Javascript.JSaddle.Monad
+--    Language.Javascript.JSaddle.Native
+--    Language.Javascript.JSaddle.Native.Internal
+--    Language.Javascript.JSaddle.Object
+--    Language.Javascript.JSaddle.Properties
+--    Language.Javascript.JSaddle.Run
+--    Language.Javascript.JSaddle.Run.Files
+--    Language.Javascript.JSaddle.String
+--    Language.Javascript.JSaddle.Types
+--    Language.Javascript.JSaddle.Value
+--    Language.Javascript.JSaddle.Warp
+--    Language.Javascript.JSaddle.Warp.Debug
+--    Language.Javascript.JSaddle.WebSockets
+--    Language.Javascript.JSaddle.WebSockets.Compat
   build-depends:    base
 --                  , reflex-react --TODO: Split into a library
-                  , text
                   , reflex-dom-core
                   , reflex
-                  , containers
-                  , mtl
                   , jsaddle
                   , jsaddle-dom
                   , jsaddle-warp
                   , ghcjs-dom
+                  , text
+                  , containers
+                  , mtl
                   , websockets
                   , deepseq
                   , aeson
@@ -52,5 +86,9 @@ executable reflex-react
   hs-source-dirs:
     src
     src-exe
+--    dep/jsaddle/jsaddle/src
+--    dep/jsaddle/jsaddle/src-ghc
+--    dep/jsaddle/jsaddle-warp/src
+--    dep/jsaddle/jsaddle-dom/src
   default-language: Haskell2010
   ghc-options: -threaded -with-rtsopts=-N10
