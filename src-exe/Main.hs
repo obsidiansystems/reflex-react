@@ -3,6 +3,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 module Main where
 
@@ -39,6 +43,11 @@ import Reflex.TriggerEvent.Base
 import Reflex.TriggerEvent.Class
 import Reflex.Dom.Core
 import Control.Concurrent
+import Data.Dependent.Sum
+import Data.Functor.Identity
+import Control.Monad.Ref
+import Data.Witherable
+import Data.Reflection
 
 import React
 
@@ -73,32 +82,72 @@ simpleComponent = do
         , createElement "button" buttonProps ["Test"]
         ]
 
-reflexComponent :: Widget () () -> ReaderT React JSM (Component JSVal ())
+type Widget' x js = ImmediateDomBuilderT (SpiderTimeline x) (DomCoreWidget' x js)
+-- | A widget that isn't attached to any particular part of the DOM hierarchy
+type FloatingWidget' x js = TriggerEventT (SpiderTimeline x) (DomCoreWidget' x js)
+
+type DomCoreWidget' x js = PostBuildT (SpiderTimeline x) (WithJSContextSingleton js (PerformEventT (SpiderTimeline x) (SpiderHost x)))
+
+--TODO: Each instance should be a separate reflex timeline
+reflexComponent :: (forall x. Given (SpiderTimeline x) => Widget' x () ()) -> ReaderT React JSM (Component JSVal ())
 reflexComponent w = component $ do
   ref <- flip useCallback (Just []) $ \_ _ [eVal] -> withJSContextSingletonMono $ \jsSing -> do
     Just e <- fromJSVal @DOM.Element eVal
     globalDoc <- currentDocumentUnchecked
     eFragment <- createDocumentFragment globalDoc
-    (events, fc) <- liftIO . attachImmediateWidget $ \hydrationMode events -> do
-      (postBuild, postBuildTriggerRef) <- newEventWithTriggerRef
-      let go :: DOM.DocumentFragment -> FloatingWidget () ()
-          go df = do
-            unreadyChildren <- liftIO $ newIORef 0
-            delayed <- liftIO $ newIORef $ pure ()
-            let builderEnv = HydrationDomBuilderEnv
-                  { _hydrationDomBuilderEnv_document = globalDoc
-                  , _hydrationDomBuilderEnv_parent = Left $ toNode df
-                  , _hydrationDomBuilderEnv_unreadyChildren = unreadyChildren
-                  , _hydrationDomBuilderEnv_commitAction = pure () --TODO: possibly `replaceElementContents n f`
-                  , _hydrationDomBuilderEnv_hydrationMode = hydrationMode
-                  , _hydrationDomBuilderEnv_switchover = never
-                  , _hydrationDomBuilderEnv_delayed = delayed
-                  }
-            lift $ runHydrationDomBuilderT w builderEnv events
-      runWithJSContextSingleton (runPostBuildT (runTriggerEventT (go eFragment) events) postBuild) jsSing
-      return (events, postBuildTriggerRef)
+    liftIO $ withSpiderTimeline $ \(t :: SpiderTimeline x) -> do
+      (events :: Chan [DSum (EventTriggerRef (SpiderTimeline x)) TriggerInvocation], fc) <- attachImmediateWidget' t $ \hydrationMode events -> do
+        (postBuild, postBuildTriggerRef) <- newEventWithTriggerRef
+        let go :: DOM.DocumentFragment -> FloatingWidget' x () ()
+            go df = do
+              unreadyChildren <- liftIO $ newIORef 0
+              delayed <- liftIO $ newIORef $ pure ()
+              let builderEnv = HydrationDomBuilderEnv
+                    { _hydrationDomBuilderEnv_document = globalDoc
+                    , _hydrationDomBuilderEnv_parent = Left $ toNode df
+                    , _hydrationDomBuilderEnv_unreadyChildren = unreadyChildren
+                    , _hydrationDomBuilderEnv_commitAction = pure () --TODO: possibly `replaceElementContents n f`
+                    , _hydrationDomBuilderEnv_hydrationMode = hydrationMode
+                    , _hydrationDomBuilderEnv_switchover = never
+                    , _hydrationDomBuilderEnv_delayed = delayed
+                    }
+              lift $ runHydrationDomBuilderT w builderEnv events
+        runWithJSContextSingleton (runPostBuildT (runTriggerEventT (go eFragment) events) postBuild) jsSing
+        return (events, postBuildTriggerRef)
+      forkIO $ processAsyncEvents' t events fc
     replaceElementContents e eFragment
-    liftIO $ forkIO $ processAsyncEvents events fc
     pure jsUndefined
   pure $ \props -> Render $ do
     pure $ createElement "div" ("ref" =: ref) ["test"]
+
+{-# INLINABLE attachImmediateWidget' #-}
+attachImmediateWidget'
+  :: SpiderTimeline x
+  -> (   IORef HydrationMode
+      -> Chan [DSum (EventTriggerRef (SpiderTimeline x)) TriggerInvocation]
+      -> PerformEventT (SpiderTimeline x) (SpiderHost x) (a, IORef (Maybe (EventTrigger (SpiderTimeline x) ())))
+     )
+  -> IO (a, FireCommand (SpiderTimeline x) (SpiderHost x))
+attachImmediateWidget' t w = give t $ do
+  hydrationMode <- liftIO $ newIORef HydrationMode_Immediate
+  events <- newChan
+  flip runSpiderHostForTimeline t $ do
+    ((result, postBuildTriggerRef), fc@(FireCommand fire)) <- hostPerformEventT $ w hydrationMode events
+    mPostBuildTrigger <- readRef postBuildTriggerRef
+    forM_ mPostBuildTrigger $ \postBuildTrigger -> fire [postBuildTrigger :=> Identity ()] $ return ()
+    return (result, fc)
+
+processAsyncEvents'
+  :: SpiderTimeline x
+  -> Chan [DSum (EventTriggerRef t) TriggerInvocation]
+  -> FireCommand t (SpiderHost x)
+  -> IO ()
+processAsyncEvents' t events (FireCommand fire) = void $ forkIO $ forever $ do
+  ers <- readChan events
+  _ <- flip runSpiderHostForTimeline t $ do
+    mes <- liftIO $ forM ers $ \(EventTriggerRef er :=> TriggerInvocation a _) -> do
+      me <- readIORef er
+      return $ fmap (\e -> e :=> Identity a) me
+    _ <- fire (catMaybes mes) $ return ()
+    liftIO $ forM_ ers $ \(_ :=> TriggerInvocation _ cb) -> cb
+  return ()
