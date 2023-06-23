@@ -54,8 +54,8 @@ main = do
     react <- fmap (React . Object) $ arg ! t "react"
     (global <# t "react") $ unReact react
     consoleLog $ unReact react
-    comp <- flip runReaderT react $ reflexComponent $ \gotProps -> do
-      display =<< count gotProps
+    comp <- flip runReaderT react $ reflexComponent $ \props -> do
+      display =<< count (updated props)
     _ <- (arg # t "setVal") [Map.singleton "comp" (pToJSVal comp) :: Map Text JSVal]
     pure ()
 
@@ -84,17 +84,20 @@ type FloatingWidget' x js = TriggerEventT (SpiderTimeline x) (DomCoreWidget' x j
 type DomCoreWidget' x js = PostBuildT (SpiderTimeline x) (WithJSContextSingleton js (PerformEventT (SpiderTimeline x) (SpiderHost x)))
 
 --TODO: Each instance should be a separate reflex timeline
-reflexComponent :: (forall x. Given (SpiderTimeline x) => Event (SpiderTimeline x) JSVal -> Widget' x () ()) -> ReaderT React JSM (Component JSVal ())
+reflexComponent :: (forall x. Given (SpiderTimeline x) => Dynamic (SpiderTimeline x) JSVal -> Widget' x () ()) -> ReaderT React JSM (Component JSVal ())
 reflexComponent w = component $ do
   propUpdaterRef <- useRef jsNull
+  initialPropsRef <- useRef jsNull
   instantiateWidget <- flip useCallback (Just []) $ \_ _ [eVal] -> withJSContextSingletonMono $ \jsSing -> do
     fromJSVal @DOM.Element eVal >>= \case
       Nothing -> pure () --TODO: This (probably) means we have been destroyed (react gives us `null` here).  Should we do anything about this?
       Just e -> do
         globalDoc <- currentDocumentUnchecked
         eFragment <- createDocumentFragment globalDoc
+        initialProps <- initialPropsRef ! t "current"
         propUpdaterIO <- liftIO $ withSpiderTimeline $ \(timeline :: SpiderTimeline x) -> do
           (gotProps, gotPropsTriggerRef) <- flip runSpiderHostForTimeline timeline newEventWithTriggerRef
+          props <- flip runSpiderHostForTimeline timeline $ holdDyn initialProps gotProps
           (events :: Chan [DSum (EventTriggerRef (SpiderTimeline x)) TriggerInvocation], fc) <- attachImmediateWidget' timeline $ \hydrationMode events -> do
             (postBuild, postBuildTriggerRef) <- newEventWithTriggerRef
             let go :: DOM.DocumentFragment -> FloatingWidget' x () ()
@@ -110,7 +113,7 @@ reflexComponent w = component $ do
                         , _hydrationDomBuilderEnv_switchover = never
                         , _hydrationDomBuilderEnv_delayed = delayed
                         }
-                  lift $ runHydrationDomBuilderT (w gotProps) builderEnv events
+                  lift $ runHydrationDomBuilderT (w props) builderEnv events
             runWithJSContextSingleton (runPostBuildT (runTriggerEventT (go eFragment) events) postBuild) jsSing
             return (events, postBuildTriggerRef)
           forkIO $ processAsyncEvents' timeline events fc
@@ -123,14 +126,18 @@ reflexComponent w = component $ do
           liftIO $ propUpdaterIO props
           pure jsUndefined
         propUpdaterRef <# t "current" $ propUpdater
+        initialPropsRef <# t "current" $ jsNull
         replaceElementContents e eFragment
     pure jsUndefined
   pure $ \props -> Render $ do
     propUpdater <- lift $ propUpdaterRef ! t "current"
     propUpdaterIsNull <- lift $ valIsNull propUpdater
-    when (not propUpdaterIsNull) $ do
-      _ <- lift $ call propUpdater nullObject [props]
-      pure ()
+    case propUpdaterIsNull of
+      True -> do
+        lift $ initialPropsRef <# t "current" $ props
+      False -> do
+        _ <- lift $ call propUpdater nullObject [props]
+        pure ()
     pure $ createElement "div" ("ref" =: instantiateWidget) ["test"]
 
 {-# INLINABLE attachImmediateWidget' #-}
