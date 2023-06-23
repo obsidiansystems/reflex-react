@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 module Main where
 
@@ -86,32 +87,36 @@ type DomCoreWidget' x js = PostBuildT (SpiderTimeline x) (WithJSContextSingleton
 reflexComponent :: (forall x. Given (SpiderTimeline x) => Widget' x () ()) -> ReaderT React JSM (Component JSVal ())
 reflexComponent w = component $ do
   ref <- flip useCallback (Just []) $ \_ _ [eVal] -> withJSContextSingletonMono $ \jsSing -> do
-    Just e <- fromJSVal @DOM.Element eVal
-    globalDoc <- currentDocumentUnchecked
-    eFragment <- createDocumentFragment globalDoc
-    liftIO $ withSpiderTimeline $ \(timeline :: SpiderTimeline x) -> do
-      (events :: Chan [DSum (EventTriggerRef (SpiderTimeline x)) TriggerInvocation], fc) <- attachImmediateWidget' timeline $ \hydrationMode events -> do
-        (postBuild, postBuildTriggerRef) <- newEventWithTriggerRef
-        let go :: DOM.DocumentFragment -> FloatingWidget' x () ()
-            go df = do
-              unreadyChildren <- liftIO $ newIORef 0
-              delayed <- liftIO $ newIORef $ pure ()
-              let builderEnv = HydrationDomBuilderEnv
-                    { _hydrationDomBuilderEnv_document = globalDoc
-                    , _hydrationDomBuilderEnv_parent = Left $ toNode df
-                    , _hydrationDomBuilderEnv_unreadyChildren = unreadyChildren
-                    , _hydrationDomBuilderEnv_commitAction = pure () --TODO: possibly `replaceElementContents n f`
-                    , _hydrationDomBuilderEnv_hydrationMode = hydrationMode
-                    , _hydrationDomBuilderEnv_switchover = never
-                    , _hydrationDomBuilderEnv_delayed = delayed
-                    }
-              lift $ runHydrationDomBuilderT w builderEnv events
-        runWithJSContextSingleton (runPostBuildT (runTriggerEventT (go eFragment) events) postBuild) jsSing
-        return (events, postBuildTriggerRef)
-      forkIO $ processAsyncEvents' timeline events fc
-    replaceElementContents e eFragment
+    consoleLog eVal
+    fromJSVal @DOM.Element eVal >>= \case
+      Nothing -> pure () --TODO: This (probably) means we have been destroyed (react gives us `null` here).  Should we do anything about this?
+      Just e -> do
+        globalDoc <- currentDocumentUnchecked
+        eFragment <- createDocumentFragment globalDoc
+        liftIO $ withSpiderTimeline $ \(timeline :: SpiderTimeline x) -> do
+          (events :: Chan [DSum (EventTriggerRef (SpiderTimeline x)) TriggerInvocation], fc) <- attachImmediateWidget' timeline $ \hydrationMode events -> do
+            (postBuild, postBuildTriggerRef) <- newEventWithTriggerRef
+            let go :: DOM.DocumentFragment -> FloatingWidget' x () ()
+                go df = do
+                  unreadyChildren <- liftIO $ newIORef 0
+                  delayed <- liftIO $ newIORef $ pure ()
+                  let builderEnv = HydrationDomBuilderEnv
+                        { _hydrationDomBuilderEnv_document = globalDoc
+                        , _hydrationDomBuilderEnv_parent = Left $ toNode df
+                        , _hydrationDomBuilderEnv_unreadyChildren = unreadyChildren
+                        , _hydrationDomBuilderEnv_commitAction = pure () --TODO: possibly `replaceElementContents n f`
+                        , _hydrationDomBuilderEnv_hydrationMode = hydrationMode
+                        , _hydrationDomBuilderEnv_switchover = never
+                        , _hydrationDomBuilderEnv_delayed = delayed
+                        }
+                  lift $ runHydrationDomBuilderT w builderEnv events
+            runWithJSContextSingleton (runPostBuildT (runTriggerEventT (go eFragment) events) postBuild) jsSing
+            return (events, postBuildTriggerRef)
+          forkIO $ processAsyncEvents' timeline events fc
+        replaceElementContents e eFragment
     pure jsUndefined
   pure $ \props -> Render $ do
+    lift $ consoleLog props
     pure $ createElement "div" ("ref" =: ref) ["test"]
 
 {-# INLINABLE attachImmediateWidget' #-}

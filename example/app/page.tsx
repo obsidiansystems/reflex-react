@@ -7,15 +7,12 @@ const Reflex = dynamic(() => import('../components/Reflex'), {
 const WithHaskell = dynamic(() => import('../components/Haskell'), {
   ssr: false
 })
+const Test = dynamic(() => import('../components/Test'), {
+  ssr: false
+})
 
 export default function Home() {
   return (
-    <WithHaskell>
-      <ul>
-        <li><Reflex></Reflex></li>
-        <li><Reflex></Reflex></li>
-        <li><Reflex></Reflex></li>
-      </ul>
-    </WithHaskell>
+    <Test/>
   )
 }

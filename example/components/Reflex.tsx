@@ -1,17 +1,14 @@
 'use client';
 
 import * as react from 'react';
-import { useContext } from 'react';
+import { useContext, useCallback } from 'react';
 import { HaskellContext } from './Haskell';
 
-export default function Reflex() {
+export default function Reflex(props) {
   const haskell = useContext(HaskellContext);
-  const ValComp = () => {
-    if(haskell) {
-      return <haskell.comp test="test" />
-    } else {
-      return <i>Blah</i>
-    }
-  };
-  return <ValComp />
+  if(haskell) {
+    return <haskell.comp {...props} />
+  } else {
+    return <i>Haskell is still loading</i>
+  }
 }

@@ -92,10 +92,13 @@ createElement etag props children = Element $ do
   lift $ react # t "createElement" $ [pure $ unTag etag, toJSVal props] <> fmap pure createdChildren
 
 fragment :: [Element] -> Element
-fragment children = Element $ do
+fragment = createFragmentWithProps mempty
+
+createFragmentWithProps :: Map Text JSVal -> [Element] -> Element
+createFragmentWithProps props children = Element $ do
   react <- ask
   fragmentTag <- lift $ fmap Tag $ react ! t "Fragment"
-  unElement $ createElement fragmentTag mempty children
+  unElement $ createElement fragmentTag props children
 
 --TODO: The Hook section shouldn't have any control flow to it; probably it also shouldn't depend on props except in specific ways
 component :: Hook (JSVal -> Render Element) -> ReaderT React JSM (Component JSVal ())
@@ -173,8 +176,19 @@ useEffect f deps = Hook $ do
   pure ()
 
 
-useMemo :: a -> Maybe [JSVal] -> Hook ()
-useMemo = undefined
+useMemo :: (ToJSVal a, FromJSVal a) => JSM a -> Maybe [JSVal] -> Hook a
+useMemo a deps = Hook $ do
+  react <- ask
+  --TODO: Garbage collect this callback.  It will be getting created every time this function re-renders, even if React decides not to use the new version.
+  (_, cb) <- lift $ newSyncCallback'' $ \_ _ _ -> toJSVal =<< a
+  depsArg <- case deps of
+    Nothing -> pure []
+    Just someDeps -> do
+      depsArray <- lift $ toJSVal someDeps
+      pure [depsArray]
+  resultVal <- lift $ (react # t "useMemo") $ [cb] <> depsArg
+  Just result <- lift $ fromJSVal resultVal
+  pure result
 
 useCallback :: (JSVal -> JSVal -> [JSVal] -> JSM JSVal) -> Maybe [JSVal] -> Hook JSVal
 useCallback f deps = Hook $ do
