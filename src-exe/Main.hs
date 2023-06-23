@@ -23,16 +23,11 @@ import Control.Monad.Reader
 import System.IO
 import Data.String
 import GHCJS.Prim.Internal (primToJSVal)
-import Reflex.Dom.Core ((=:))
 import qualified GHCJS.DOM.Types as DOM
 import Reflex.Dom.Builder.Immediate
 import GHCJS.DOM (currentDocumentUnchecked)
-import qualified GHCJS.DOM as DOM
 import GHCJS.DOM.Document (createDocumentFragment)
-import GHCJS.DOM.Element
 import GHCJS.DOM.Node
-import GHCJS.DOM.NonElementParentNode
-import GHCJS.DOM.Types (JSM)
 import Reflex.Host.Class
 import Reflex.PerformEvent.Base
 import Reflex.PostBuild.Base
@@ -40,13 +35,12 @@ import Data.IORef
 import Reflex.Class
 import Foreign.JavaScript.TH
 import Reflex.TriggerEvent.Base
-import Reflex.TriggerEvent.Class
 import Reflex.Dom.Core
 import Control.Concurrent
 import Data.Dependent.Sum
 import Data.Functor.Identity
 import Control.Monad.Ref
-import Data.Witherable
+import Witherable
 import Data.Reflection
 
 import React
@@ -95,8 +89,8 @@ reflexComponent w = component $ do
     Just e <- fromJSVal @DOM.Element eVal
     globalDoc <- currentDocumentUnchecked
     eFragment <- createDocumentFragment globalDoc
-    liftIO $ withSpiderTimeline $ \(t :: SpiderTimeline x) -> do
-      (events :: Chan [DSum (EventTriggerRef (SpiderTimeline x)) TriggerInvocation], fc) <- attachImmediateWidget' t $ \hydrationMode events -> do
+    liftIO $ withSpiderTimeline $ \(timeline :: SpiderTimeline x) -> do
+      (events :: Chan [DSum (EventTriggerRef (SpiderTimeline x)) TriggerInvocation], fc) <- attachImmediateWidget' timeline $ \hydrationMode events -> do
         (postBuild, postBuildTriggerRef) <- newEventWithTriggerRef
         let go :: DOM.DocumentFragment -> FloatingWidget' x () ()
             go df = do
@@ -114,7 +108,7 @@ reflexComponent w = component $ do
               lift $ runHydrationDomBuilderT w builderEnv events
         runWithJSContextSingleton (runPostBuildT (runTriggerEventT (go eFragment) events) postBuild) jsSing
         return (events, postBuildTriggerRef)
-      forkIO $ processAsyncEvents' t events fc
+      forkIO $ processAsyncEvents' timeline events fc
     replaceElementContents e eFragment
     pure jsUndefined
   pure $ \props -> Render $ do
@@ -128,10 +122,10 @@ attachImmediateWidget'
       -> PerformEventT (SpiderTimeline x) (SpiderHost x) (a, IORef (Maybe (EventTrigger (SpiderTimeline x) ())))
      )
   -> IO (a, FireCommand (SpiderTimeline x) (SpiderHost x))
-attachImmediateWidget' t w = give t $ do
+attachImmediateWidget' timeline w = give timeline $ do
   hydrationMode <- liftIO $ newIORef HydrationMode_Immediate
   events <- newChan
-  flip runSpiderHostForTimeline t $ do
+  flip runSpiderHostForTimeline timeline $ do
     ((result, postBuildTriggerRef), fc@(FireCommand fire)) <- hostPerformEventT $ w hydrationMode events
     mPostBuildTrigger <- readRef postBuildTriggerRef
     forM_ mPostBuildTrigger $ \postBuildTrigger -> fire [postBuildTrigger :=> Identity ()] $ return ()
@@ -142,9 +136,9 @@ processAsyncEvents'
   -> Chan [DSum (EventTriggerRef t) TriggerInvocation]
   -> FireCommand t (SpiderHost x)
   -> IO ()
-processAsyncEvents' t events (FireCommand fire) = void $ forkIO $ forever $ do
+processAsyncEvents' timeline events (FireCommand fire) = void $ forkIO $ forever $ do
   ers <- readChan events
-  _ <- flip runSpiderHostForTimeline t $ do
+  _ <- flip runSpiderHostForTimeline timeline $ do
     mes <- liftIO $ forM ers $ \(EventTriggerRef er :=> TriggerInvocation a _) -> do
       me <- readIORef er
       return $ fmap (\e -> e :=> Identity a) me
