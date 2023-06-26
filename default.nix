@@ -23,6 +23,7 @@
       ];
     }
     ./dep/jsaddle-dom
+    ./dep/reflex
   ];
   overrides = [
     ({ config, pkgs, lib, ... }: {
