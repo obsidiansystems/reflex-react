@@ -82,7 +82,10 @@ executable reflex-react
                   , wai
                   , wai-websockets
                   , warp
+                  , witherable
                   , foreign-store
+                  , dependent-sum
+                  , reflection
   hs-source-dirs:
     src
     src-exe
