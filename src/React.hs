@@ -46,6 +46,9 @@ printJavaScriptException (JavaScriptException e) = do
 #ifndef ghcjs_HOST_OS
 instance PToJSVal Text where
   pToJSVal s = primToJSVal $ PrimVal_String s
+
+instance PToJSVal Int where
+  pToJSVal i = primToJSVal $ PrimVal_Number $ fromIntegral i
 #endif
 
 instance IsString JSVal where
