@@ -87,6 +87,7 @@ executable reflex-react
 
   if impl(ghcjs)
     build-depends: ghcjs-base == 0.2.*
+                  , ghcjs-prim
                   -- This is to allow the hashable patches to work
                   -- the hashable should to be pinned in reflex-platform
                   , hashable == 1.3.5.0
