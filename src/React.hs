@@ -61,10 +61,13 @@ instance PToJSVal Function where
 instance PToJSVal Object where
   pToJSVal (Object v) = v
 
+newtype Component props refVal = Component { unComponent :: Function }
+
 newtype Hook a = Hook { unHook :: ReaderT React JSM a }
   deriving (Functor, Applicative, Monad)
 
-newtype Component props refVal = Component { unComponent :: Function }
+newtype Render a = Render { unRender :: ReaderT React JSM a }
+  deriving (Functor, Applicative, Monad)
 
 -- | An object that contains the React library
 newtype React = React { unReact :: Object }
@@ -91,8 +94,8 @@ createElement etag props children = Element $ do
   createdChildren <- mapM unElement children
   lift $ react # t "createElement" $ [pure $ unTag etag, toJSVal props] <> fmap pure createdChildren
 
-fragment :: [Element] -> Element
-fragment = createFragmentWithProps mempty
+createFragment :: [Element] -> Element
+createFragment = createFragmentWithProps mempty
 
 createFragmentWithProps :: Map Text JSVal -> [Element] -> Element
 createFragmentWithProps props children = Element $ do
@@ -114,7 +117,6 @@ component (Hook hook) = do
   pure $ Component $ Function callbackId (Object jsVal)
 
 --TODO: Input can be an initializer function rather than value
---TODO: JSVal
 --TODO: `set` can take `a -> a` instead of `a`
 useState :: (ToJSVal a, FromJSVal a) => a -> Hook (a, a -> JSM ())
 useState initialValue = Hook $ do
@@ -128,11 +130,50 @@ useState initialValue = Hook $ do
     , \v' -> void $ call setter nullObject [v']
     )
 
---TODO: Can be called during rendering https://react.dev/reference/react/useState#storing-information-from-previous-renders but "shouldn't" generally
-type SetFunction a = Either a (a -> a) -> Effect ()
+useRef :: JSVal -> Hook JSVal
+useRef initialValue = Hook $ do
+  react <- ask
+  lift $ (react # t "useRef") initialValue
 
-useReducer :: Reducer s a -> a -> Maybe (a -> a) -> Hook (a, DispatchFunction a)
-useReducer = undefined
+useEffect :: (JSVal -> JSVal -> [JSVal] -> JSM JSVal) -> Maybe [JSVal] -> Hook ()
+useEffect f deps = Hook $ do
+  react <- ask
+  (_, cb) <- lift $ newSyncCallback'' f
+  depsArg <- case deps of
+    Nothing -> pure []
+    Just someDeps -> do
+      depsArray <- lift $ toJSVal someDeps
+      pure [depsArray]
+  _ <- lift $ (react # t "useEffect") $ [cb] <> depsArg
+  pure ()
+
+useMemo :: (ToJSVal a, FromJSVal a) => JSM a -> Maybe [JSVal] -> Hook a
+useMemo a deps = Hook $ do
+  react <- ask
+  (_, cb) <- lift $ newSyncCallback'' $ \_ _ _ -> toJSVal =<< a
+  depsArg <- case deps of
+    Nothing -> pure []
+    Just someDeps -> do
+      depsArray <- lift $ toJSVal someDeps
+      pure [depsArray]
+  resultVal <- lift $ (react # t "useMemo") $ [cb] <> depsArg
+  Just result <- lift $ fromJSVal resultVal
+  pure result
+
+useCallback :: (JSVal -> JSVal -> [JSVal] -> JSM JSVal) -> Maybe [JSVal] -> Hook JSVal
+useCallback f deps = Hook $ do
+  react <- ask
+  (_, cb) <- lift $ newSyncCallback'' f
+  depsArg <- case deps of
+    Nothing -> pure []
+    Just someDeps -> do
+      depsArray <- lift $ toJSVal someDeps
+      pure [depsArray]
+  lift $ (react # t "useCallback") $ [cb] <> depsArg
+
+--------------------------------------------------------------------------------
+-- Not yet supported
+--------------------------------------------------------------------------------
 
 type DispatchFunction a = a -> Effect ()
 
@@ -149,11 +190,6 @@ createContext = undefined
 provider :: Context a -> a -> Render b -> Render b
 provider = undefined
 
-useRef :: JSVal -> Hook JSVal
-useRef initialValue = Hook $ do
-  react <- ask
-  lift $ (react # t "useRef") initialValue
-
 data Ref a
 
 forwardRef :: (props -> Ref refVal -> Hook (Render ())) -> Component props refVal
@@ -162,45 +198,8 @@ forwardRef = undefined
 useImperativeHandle :: Ref a -> Effect a -> Maybe [JSVal] -> Hook ()
 useImperativeHandle = undefined
 
-useEffect :: (JSVal -> JSVal -> [JSVal] -> JSM JSVal) -> Maybe [JSVal] -> Hook ()
-useEffect f deps = Hook $ do
-  react <- ask
-  --TODO: Garbage collect this callback.  It will be getting created every time this function re-renders, even if React decides not to use the new version.
-  (_, cb) <- lift $ newSyncCallback'' f
-  depsArg <- case deps of
-    Nothing -> pure []
-    Just someDeps -> do
-      depsArray <- lift $ toJSVal someDeps
-      pure [depsArray]
-  _ <- lift $ (react # t "useEffect") $ [cb] <> depsArg
-  pure ()
-
-
-useMemo :: (ToJSVal a, FromJSVal a) => JSM a -> Maybe [JSVal] -> Hook a
-useMemo a deps = Hook $ do
-  react <- ask
-  --TODO: Garbage collect this callback.  It will be getting created every time this function re-renders, even if React decides not to use the new version.
-  (_, cb) <- lift $ newSyncCallback'' $ \_ _ _ -> toJSVal =<< a
-  depsArg <- case deps of
-    Nothing -> pure []
-    Just someDeps -> do
-      depsArray <- lift $ toJSVal someDeps
-      pure [depsArray]
-  resultVal <- lift $ (react # t "useMemo") $ [cb] <> depsArg
-  Just result <- lift $ fromJSVal resultVal
-  pure result
-
-useCallback :: (JSVal -> JSVal -> [JSVal] -> JSM JSVal) -> Maybe [JSVal] -> Hook JSVal
-useCallback f deps = Hook $ do
-  react <- ask
-  --TODO: Garbage collect this callback.  It will be getting created every time this function re-renders, even if React decides not to use the new version.
-  (_, cb) <- lift $ newSyncCallback'' f
-  depsArg <- case deps of
-    Nothing -> pure []
-    Just someDeps -> do
-      depsArray <- lift $ toJSVal someDeps
-      pure [depsArray]
-  lift $ (react # t "useCallback") $ [cb] <> depsArg
+useReducer :: Reducer s a -> a -> Maybe (a -> a) -> Hook (a, DispatchFunction a)
+useReducer = undefined
 
 useTransition :: Hook (Bool, Effect () -> Effect ())
 useTransition = undefined
@@ -216,9 +215,6 @@ useId = undefined
 
 useSyncExternalStore :: (IO () -> IO (IO ())) -> IO a -> Maybe (IO a) -> Hook ()
 useSyncExternalStore = undefined
-
-newtype Render a = Render { unRender :: ReaderT React JSM a }
-  deriving (Functor, Applicative, Monad)
 
 newtype Effect a = Effect { unEffect :: JSM a }
   deriving (Functor, Applicative, Monad)

@@ -1,7 +1,7 @@
 'use client';
 
 import * as react from 'react';
-import { useContext, useCallback } from 'react';
+import { useContext } from 'react';
 import { HaskellContext } from './Haskell';
 
 export default function Reflex(props) {
