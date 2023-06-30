@@ -85,7 +85,7 @@ reflexComponent w = component $ do
             forM_ mGotPropsTrigger $ \gotPropsTrigger -> case fc of
               FireCommand fire -> flip runSpiderHostForTimeline timeline $ do
                 fire [gotPropsTrigger :=> Identity newProps] $ return ()
-        (_, propUpdater) <- newSyncCallback'' $ \_ _ [props] -> do
+        Function' _ propUpdater <- function' $ \_ _ [props] -> do
           liftIO $ propUpdaterIO props
           pure jsUndefined
         propUpdaterRef <# t "current" $ propUpdater
