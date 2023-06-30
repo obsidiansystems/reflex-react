@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -14,7 +15,6 @@ module Main where
 import Prelude hiding ((!!))
 
 import Data.Text (Text)
-import Language.Javascript.JSaddle.Warp
 import Language.Javascript.JSaddle hiding (Ref)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -22,10 +22,13 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import System.IO
 import Data.String
-import GHCJS.Prim.Internal (primToJSVal)
 import Reflex.Class
 import Reflex.Dom.Core
 import Control.Concurrent
+
+#ifndef ghcjs_HOST_OS
+import Language.Javascript.JSaddle.Warp
+#endif
 
 import React
 import Reflex.React
@@ -46,7 +49,7 @@ main = do
 provideJS :: ReaderT React JSM (Map Text JSVal) -> IO ()
 provideJS build = do
   let port = 3001 --TODO: Get this from npm config or something
-  run port $ \arg -> (`catchError` printJavaScriptException) $ do
+  runJS port $ \arg -> do
     react <- fmap (React . Object) $ arg ! t "react"
     m <- flip runReaderT react build
     _ <- (arg # t "setVal") [m]
@@ -59,7 +62,7 @@ simpleComponent = do
     (v, setV) <- useState (0 :: Int)
     onButton <- useCallback (\_ _ _ -> flip runReaderT react $ do
         lift $ setV $ v + 1
-        pure jsUndefined) (Just [primToJSVal $ PrimVal_Number $ fromIntegral v])
+        pure jsUndefined) (Just [(pToJSVal v) :: JSVal])
     pure $ \myProps -> Render $ do
       myPropsJson <- lift $ fromJSString <$> valToJSON myProps
       let buttonProps = mconcat
@@ -69,3 +72,18 @@ simpleComponent = do
         [ createElement "strong" mempty ["Props: ", fromString myPropsJson, "; State: ", fromString $ show v]
         , createElement "button" buttonProps ["Test"]
         ]
+
+#ifdef ghcjs_HOST_OS
+
+foreign import javascript unsafe "getReactAndSetHaskell"
+    getReactAndSetHaskell :: JSM (JSVal)
+
+runJS _ f = f =<< getReactAndSetHaskell
+
+#else
+
+runJS :: Int -> (JSVal -> JSM ()) -> IO ()
+runJS port f = do
+  run port $ \arg -> f arg `catchError` printJavaScriptException
+
+#endif
