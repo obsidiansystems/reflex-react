@@ -25,6 +25,7 @@ import Data.String
 import GHCJS.Prim.Internal (primToJSVal)
 import Reflex.Class
 import Reflex.Dom.Core
+import Control.Concurrent
 
 import React
 import Reflex.React
@@ -32,12 +33,23 @@ import Reflex.React
 main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
+  provideJS $ sequence $ Map.fromList
+    [ ( "reflex"
+      , fmap pToJSVal $ reflexComponent $ \props -> do
+          display =<< count (updated props)
+      )
+    , ( "simple"
+      , fmap pToJSVal simpleComponent
+      )
+    ]
+
+provideJS :: ReaderT React JSM (Map Text JSVal) -> IO ()
+provideJS build = do
   let port = 3001 --TODO: Get this from npm config or something
   run port $ \arg -> (`catchError` printJavaScriptException) $ do
     react <- fmap (React . Object) $ arg ! t "react"
-    comp <- flip runReaderT react $ reflexComponent $ \props -> do
-      display =<< count (updated props)
-    _ <- (arg # t "setVal") [Map.singleton "comp" (pToJSVal comp) :: Map Text JSVal]
+    m <- flip runReaderT react build
+    _ <- (arg # t "setVal") [m]
     pure ()
 
 simpleComponent :: ReaderT React JSM (Component JSVal ())
