@@ -1,22 +1,18 @@
-"use client";
+'use client';
 
 import { WithHaskell, HaskellComponent } from './Haskell'
 import { useState, useMemo, useCallback, Suspense } from 'react';
+import { SimpleStateTypescript, SimpleStateHaskell, SimpleStateReflex } from './SimpleState';
 
 export default function Test() {
   const [v, setV] = useState(0);
-  const e = useMemo(() => document.createElement("input"))
   return (
-    <WithHaskell fallback={<i>Loading Haskell...</i>}>
-      <button onClick={() => setV((old) => old+1)}>Increment</button>
-      <div id={v} />
+    <WithHaskell fallback={<i>Loading...</i>}>
+      <input type="number" value={v.toString()} onChange={e => setV(Number(e.target.value))} />
       <ul>
-        <li><Suspense fallback={<i>Loading Haskell...</i>}><HaskellComponent name="reflex" v={v} /></Suspense></li>
-        <li><Suspense fallback={<i>Loading Haskell...</i>}><HaskellComponent name="reflex" v={v} /></Suspense></li>
-        <li><Suspense fallback={<i>Loading Haskell...</i>}><HaskellComponent name="reflex" v={v} /></Suspense></li>
-        <li><Suspense fallback={<i>Loading Haskell...</i>}><HaskellComponent name="simple" v={v} /></Suspense></li>
-        <li><Suspense fallback={<i>Loading Haskell...</i>}><HaskellComponent name="simple" v={v} /></Suspense></li>
-        <li><Suspense fallback={<i>Loading Haskell...</i>}><HaskellComponent name="simple" v={v} /></Suspense></li>
+        <li><SimpleStateTypescript v={v} /></li>
+        <li><SimpleStateHaskell v={v} /></li>
+        <li><SimpleStateReflex v={v} /></li>
       </ul>
     </WithHaskell>
   )

@@ -8,6 +8,8 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE RecursiveDo #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 module Main where
 
@@ -34,11 +36,20 @@ main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
   provideJS $ sequence $ Map.fromList
-    [ ( "reflex"
-      , fmap pToJSVal $ reflexComponent $ \props -> do
-          display =<< count (updated props)
+    [ ( "simpleStateReflex"
+      , fmap pToJSVal $ reflexComponent valToJSON $ \props -> do
+          el "h1" $ text "Reflex"
+          el "p" $ do
+            el "strong" $ text "Props: "
+            dynText $ fmap fromJSString props
+          el "p" $ mdo
+            el "strong" $ text "State: "
+            display numClicks
+            clicked <- button "+"
+            numClicks <- count clicked
+            pure ()
       )
-    , ( "simple"
+    , ( "simpleStateHaskell"
       , fmap pToJSVal simpleComponent
       )
     ]
@@ -54,18 +65,20 @@ provideJS build = do
 
 simpleComponent :: ReaderT React JSM (Component JSVal ())
 simpleComponent = do
-  react <- ask
   component $ do
     (v, setV) <- useState (0 :: Int)
-    onButton <- useCallback (\_ _ _ -> flip runReaderT react $ do
-        lift $ setV $ v + 1
-        pure jsUndefined) (Just [primToJSVal $ PrimVal_Number $ fromIntegral v])
+    onButton <- useCallback (\_ _ _ -> setV $ v + 1) (Just [toJSVal v])
     pure $ \myProps -> Render $ do
       myPropsJson <- lift $ fromJSString <$> valToJSON myProps
-      let buttonProps = mconcat
-            [ Map.singleton "onClick" onButton
-            ]
       pure $ createFragment
-        [ createElement "strong" mempty ["Props: ", fromString myPropsJson, "; State: ", fromString $ show v]
-        , createElement "button" buttonProps ["Test"]
+        [ createElement "h1" mempty ["React-Haskell"]
+        , createElement "p" mempty
+          [ createElement "strong" mempty ["Props: "]
+          , fromString myPropsJson
+          ]
+        , createElement "p" mempty
+          [ createElement "strong" mempty ["State: "]
+          , fromString $ show v
+          , createElement "button" ("onClick" =: onButton) ["+"]
+          ]
         ]

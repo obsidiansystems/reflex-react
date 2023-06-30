@@ -89,11 +89,12 @@ export function WithHaskell({children, fallback}) {
   );
 }
 
-//TODO: Remove the limitation that Haskell components may not accept a prop called `name`
 /**
- * Render a React component which was exported from Haskell under the given `name`.  All props other than `name` will be passed through to the Haskell component.
+ * Import a React component written in Haskell.  You must do this at the top level of your code or otherwise ensure that this doesn't get re-run, since each invocation will produce a different component object.
  */
-export function HaskellComponent({name, ...props}) {
-  const haskell = useHaskell();
-  return createElement(haskell[name], props);
+export function ImportHaskellComponent(name) {
+  return (props) => {
+    const haskell = useHaskell();
+    return createElement(haskell[name], props);
+  };
 }

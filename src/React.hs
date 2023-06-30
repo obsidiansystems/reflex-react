@@ -160,14 +160,14 @@ useMemo a deps = Hook $ do
   Just result <- lift $ fromJSVal resultVal
   pure result
 
-useCallback :: (JSVal -> JSVal -> [JSVal] -> JSM JSVal) -> Maybe [JSVal] -> Hook JSVal
+useCallback :: ToJSVal result => (JSVal -> JSVal -> [JSVal] -> JSM result) -> Maybe [JSM JSVal] -> Hook JSVal
 useCallback f deps = Hook $ do
   react <- ask
-  (_, cb) <- lift $ newSyncCallback'' f
+  (_, cb) <- lift $ newSyncCallback'' $ \fObj this args -> toJSVal =<< f fObj this args
   depsArg <- case deps of
     Nothing -> pure []
     Just someDeps -> do
-      depsArray <- lift $ toJSVal someDeps
+      depsArray <- lift $ toJSVal =<< sequence someDeps
       pure [depsArray]
   lift $ (react # t "useCallback") $ [cb] <> depsArg
 

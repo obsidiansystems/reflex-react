@@ -46,8 +46,12 @@ type FloatingWidget' x js = TriggerEventT (SpiderTimeline x) (DomCoreWidget' x j
 type DomCoreWidget' x js = PostBuildT (SpiderTimeline x) (WithJSContextSingleton js (PerformEventT (SpiderTimeline x) (SpiderHost x)))
 
 -- | Turn a Reflex widget into a React component.  It receives `props` from its parent component as a Dynamic JSVal.
-reflexComponent :: (forall x. Given (SpiderTimeline x) => Dynamic (SpiderTimeline x) JSVal -> Widget' x () ()) -> ReaderT React JSM (Component JSVal ())
-reflexComponent w = component $ do
+reflexComponent
+  :: forall props
+  .  (JSVal -> JSM props)
+  -> (forall x. Given (SpiderTimeline x) => Dynamic (SpiderTimeline x) props -> Widget' x () ())
+  -> ReaderT React JSM (Component JSVal ())
+reflexComponent decodeProps w = component $ do
   propUpdaterRef <- useRef jsNull
   initialPropsRef <- useRef jsNull
   instantiateWidget <- flip useCallback (Just []) $ \_ _ [eVal] -> withJSContextSingletonMono $ \jsSing -> do
@@ -56,8 +60,8 @@ reflexComponent w = component $ do
       Just e -> do
         globalDoc <- currentDocumentUnchecked
         eFragment <- createDocumentFragment globalDoc
-        initialProps <- initialPropsRef ! t "current"
-        propUpdaterIO <- liftIO $ withSpiderTimeline $ \(timeline :: SpiderTimeline x) -> do
+        initialProps <- decodeProps =<< (initialPropsRef ! t "current")
+        propUpdaterJSM <- liftIO $ withSpiderTimeline $ \(timeline :: SpiderTimeline x) -> do
           (gotProps, gotPropsTriggerRef) <- flip runSpiderHostForTimeline timeline newEventWithTriggerRef
           props <- flip runSpiderHostForTimeline timeline $ holdDyn initialProps gotProps
           (events :: Chan [DSum (EventTriggerRef (SpiderTimeline x)) TriggerInvocation], fc) <- attachImmediateWidget' timeline $ \hydrationMode events -> do
@@ -80,13 +84,15 @@ reflexComponent w = component $ do
             runWithJSContextSingleton (runPostBuildT (runTriggerEventT (go eFragment) events) postBuild) jsSing
             return (events, postBuildTriggerRef)
           forkIO $ processAsyncEvents' timeline events fc
-          pure $ \newProps -> do
-            mGotPropsTrigger <- readRef gotPropsTriggerRef
-            forM_ mGotPropsTrigger $ \gotPropsTrigger -> case fc of
-              FireCommand fire -> flip runSpiderHostForTimeline timeline $ do
-                fire [gotPropsTrigger :=> Identity newProps] $ return ()
+          pure $ \newPropsRaw -> do
+            newProps <- decodeProps newPropsRaw
+            liftIO $ do
+              mGotPropsTrigger <- readRef gotPropsTriggerRef
+              forM_ mGotPropsTrigger $ \gotPropsTrigger -> case fc of
+                FireCommand fire -> flip runSpiderHostForTimeline timeline $ do
+                  fire [gotPropsTrigger :=> Identity newProps] $ return ()
         (_, propUpdater) <- newSyncCallback'' $ \_ _ [props] -> do
-          liftIO $ propUpdaterIO props
+          propUpdaterJSM props
           pure jsUndefined
         propUpdaterRef <# t "current" $ propUpdater
         initialPropsRef <# t "current" $ jsNull
