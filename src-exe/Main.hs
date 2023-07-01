@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -16,7 +17,6 @@ module Main where
 import Prelude hiding ((!!))
 
 import Data.Text (Text)
-import Language.Javascript.JSaddle.Warp
 import Language.Javascript.JSaddle hiding (Ref)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -25,6 +25,10 @@ import Control.Monad.Reader
 
 import Example.SimpleProps
 import Example.SimpleState
+
+#ifndef ghcjs_HOST_OS
+import Language.Javascript.JSaddle.Warp
+#endif
 
 import React
 
@@ -47,9 +51,23 @@ main = exportToJS $ sequence $ Map.fromList
 exportToJS :: ReaderT React JSM (Map Text JSVal) -> IO ()
 exportToJS build = do
   let port = 3001 --TODO: Get this from npm config or something
-  run port $ \arg -> (`catchError` printJavaScriptException) $ do
+  runJS port $ \arg -> do
     react <- fmap (React . Object) $ arg ! t "react"
     m <- flip runReaderT react build
     _ <- (arg # t "setVal") [m]
     pure ()
 
+#ifdef ghcjs_HOST_OS
+
+foreign import javascript unsafe "getReactAndSetHaskell"
+    getReactAndSetHaskell :: JSM (JSVal)
+
+runJS _ f = f =<< getReactAndSetHaskell
+
+#else
+
+runJS :: Int -> (JSVal -> JSM ()) -> IO ()
+runJS port f = do
+  run port $ \arg -> f arg `catchError` printJavaScriptException
+
+#endif

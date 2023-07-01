@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -18,8 +19,14 @@ import qualified Data.Map as Map
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader
-import GHCJS.Prim.Internal (primToJSVal)
 import Data.String
+
+#ifndef ghcjs_HOST_OS
+import GHCJS.Prim.Internal (primToJSVal)
+#else
+import GHCJS.Foreign.Callback
+import qualified JavaScript.Array as Array (toListIO, fromListIO)
+#endif
 
 t :: Text -> Text
 t = id
@@ -27,14 +34,21 @@ t = id
 tshow :: Show a => a -> Text
 tshow = T.pack . show
 
+#ifndef ghcjs_HOST_OS
 printJavaScriptException :: JavaScriptException -> JSM ()
 printJavaScriptException (JavaScriptException e) = do
   s <- e # t "toString" $ ()
   j <- valToJSON s
   liftIO $ T.putStrLn $ "Exception: " <> tshow j
+#endif
 
+#ifndef ghcjs_HOST_OS
 instance PToJSVal Text where
   pToJSVal s = primToJSVal $ PrimVal_String s
+
+instance PToJSVal Int where
+  pToJSVal i = primToJSVal $ PrimVal_Number $ fromIntegral i
+#endif
 
 instance IsString JSVal where
   fromString = pToJSVal . T.pack
@@ -61,7 +75,7 @@ instance PToJSVal Function where
 instance PToJSVal Object where
   pToJSVal (Object v) = v
 
-newtype Component props refVal = Component { unComponent :: Function }
+newtype Component props refVal = Component { unComponent :: Function' }
 
 newtype Hook a = Hook { unHook :: ReaderT React JSM a }
   deriving (Functor, Applicative, Monad)
@@ -76,7 +90,7 @@ instance MakeObject React where
   makeObject = pure . unReact
 
 instance MakeObject (Component props refVal) where
-  makeObject = makeObject . functionObject . unComponent
+  makeObject = makeObject . functionObject' . unComponent
 
 newtype Element = Element { unElement :: ReaderT React JSM JSVal }
 
@@ -107,14 +121,14 @@ createFragmentWithProps props children = Element $ do
 component :: Hook (JSVal -> Render Element) -> ReaderT React JSM (Component JSVal ())
 component (Hook hook) = do
   react <- ask
-  (callbackId, jsVal) <- lift $ newSyncCallback'' $ \_ _ args -> flip runReaderT react $ do
+  f <- lift $ function' $ \_ _ args -> flip runReaderT react $ do
     render <- hook
     let props = case args of
           [] -> jsUndefined
           arg0 : _ -> arg0
     e <- unRender $ render props
     unElement e
-  pure $ Component $ Function callbackId (Object jsVal)
+  pure $ Component f
 
 --TODO: Input can be an initializer function rather than value
 --TODO: `set` can take `a -> a` instead of `a`
@@ -138,38 +152,38 @@ useRef initialValue = Hook $ do
 useEffect :: (JSVal -> JSVal -> [JSVal] -> JSM JSVal) -> Maybe [JSVal] -> Hook ()
 useEffect f deps = Hook $ do
   react <- ask
-  (_, cb) <- lift $ newSyncCallback'' f
+  Function' _ cb <- lift $ function' f
   depsArg <- case deps of
     Nothing -> pure []
     Just someDeps -> do
       depsArray <- lift $ toJSVal someDeps
       pure [depsArray]
-  _ <- lift $ (react # t "useEffect") $ [cb] <> depsArg
+  _ <- lift $ (react # t "useEffect") $ [pToJSVal cb] <> depsArg
   pure ()
 
 useMemo :: (ToJSVal a, FromJSVal a) => JSM a -> Maybe [JSVal] -> Hook a
 useMemo a deps = Hook $ do
   react <- ask
-  (_, cb) <- lift $ newSyncCallback'' $ \_ _ _ -> toJSVal =<< a
+  Function' _ cb <- lift $ function' $ \_ _ _ -> toJSVal =<< a
   depsArg <- case deps of
     Nothing -> pure []
     Just someDeps -> do
       depsArray <- lift $ toJSVal someDeps
       pure [depsArray]
-  resultVal <- lift $ (react # t "useMemo") $ [cb] <> depsArg
+  resultVal <- lift $ (react # t "useMemo") $ [pToJSVal cb] <> depsArg
   Just result <- lift $ fromJSVal resultVal
   pure result
 
 useCallback :: ToJSVal result => (JSVal -> JSVal -> [JSVal] -> JSM result) -> Maybe [JSM JSVal] -> Hook JSVal
 useCallback f deps = Hook $ do
   react <- ask
-  (_, cb) <- lift $ newSyncCallback'' $ \fObj this args -> toJSVal =<< f fObj this args
+  Function' _ cb <- lift $ function' $ \fObj this args -> toJSVal =<< f fObj this args
   depsArg <- case deps of
     Nothing -> pure []
     Just someDeps -> do
       depsArray <- lift $ toJSVal =<< sequence someDeps
       pure [depsArray]
-  lift $ (react # t "useCallback") $ [cb] <> depsArg
+  lift $ (react # t "useCallback") $ [pToJSVal cb] <> depsArg
 
 --------------------------------------------------------------------------------
 -- Not yet supported
@@ -218,3 +232,41 @@ useSyncExternalStore = undefined
 
 newtype Effect a = Effect { unEffect :: JSM a }
   deriving (Functor, Applicative, Monad)
+
+-- TODO: Add the following in jsaddle
+type JSCallAsFunction' = JSVal      -- ^ Function object
+                     -> JSVal      -- ^ this
+                     -> [JSVal]    -- ^ Function arguments
+                     -> JSM JSVal  -- ^ Return value
+
+function' :: JSCallAsFunction' -- ^ Haskell function to call
+         -> JSM Function'     -- ^ Returns a JavaScript function object that will
+                             --   call the Haskell one when it is called
+#ifdef ghcjs_HOST_OS
+function' f = do
+    callback <- syncCallback2' $ \this args -> do
+        rargs <- Array.toListIO (coerce args)
+        f this this rargs -- TODO pass function object through
+    Function' callback <$> makeFunctionWithCallback' callback
+#else
+function' f = do
+    (cb, f') <- newSyncCallback'' f --TODO: "ContinueAsync" behavior
+    return $ Function' cb $ Object f'
+#endif
+
+#ifdef ghcjs_HOST_OS
+data Function' = Function' {functionCallback' :: Callback (JSVal -> JSVal -> IO JSVal), functionObject' :: Object}
+#else
+data Function' = Function' {functionCallback' :: CallbackId, functionObject' :: Object}
+#endif
+
+#ifdef ghcjs_HOST_OS
+foreign import javascript unsafe "$r = function () { return $1(this, arguments); }"
+    makeFunctionWithCallback' :: Callback (JSVal -> JSVal -> IO JSVal) -> IO Object
+#endif
+
+instance ToJSVal Function' where
+    toJSVal = toJSVal . functionObject'
+
+instance PToJSVal Function' where
+  pToJSVal (Function' _ o) = pToJSVal o

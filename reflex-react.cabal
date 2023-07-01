@@ -17,134 +17,20 @@ executable reflex-react
   main-is:          Main.hs
   other-modules:
     React
-    Data.JSString.Internal.Type
-    Data.JSString.Text
-    GHCJS.Foreign.Internal
-    GHCJS.Internal.Types
-    GHCJS.Marshal
-    GHCJS.Marshal.Internal
-    GHCJS.Marshal.Pure
-    GHCJS.Prim
-    GHCJS.Prim.Internal
-    GHCJS.Types
-    JavaScript.Array
-    JavaScript.Array.Internal
-    JavaScript.Object.Internal
-    Language.Javascript.JSaddle
-    Language.Javascript.JSaddle.Arguments
-    Language.Javascript.JSaddle.Classes
-    Language.Javascript.JSaddle.Classes.Internal
-    Language.Javascript.JSaddle.Debug
-    Language.Javascript.JSaddle.Evaluate
-    Language.Javascript.JSaddle.Marshal.String
-    Language.Javascript.JSaddle.Monad
-    Language.Javascript.JSaddle.Native
-    Language.Javascript.JSaddle.Native.Internal
-    Language.Javascript.JSaddle.Object
-    Language.Javascript.JSaddle.Properties
-    Language.Javascript.JSaddle.Run
-    Language.Javascript.JSaddle.Run.Files
-    Language.Javascript.JSaddle.String
-    Language.Javascript.JSaddle.Types
-    Language.Javascript.JSaddle.Value
-    Language.Javascript.JSaddle.Warp
-    Language.Javascript.JSaddle.Warp.Debug
-    Language.Javascript.JSaddle.WebSockets
-    Language.Javascript.JSaddle.WebSockets.Compat
-    Control.Monad.ReaderIO
-    Data.FastMutableIntMap
-    Data.FastWeakBag
-    Data.Map.Misc
-    Data.Trie
-    Data.WeakBag
-    Foreign.JavaScript.Orphans
-    Foreign.JavaScript.TH
-    Foreign.JavaScript.Utils
-    GHCJS.Buffer
-    GHCJS.Buffer.Types
-    GHCJS.Foreign
-    JavaScript.TypedArray.ArrayBuffer
-    JavaScript.TypedArray.ArrayBuffer.Internal
-    JavaScript.TypedArray.DataView.Internal
-    JavaScript.TypedArray.Internal.Types
-    Language.Javascript.JSaddle.Helper
-    Reflex
-    Reflex.Adjustable.Class
-    Reflex.BehaviorWriter.Base
-    Reflex.BehaviorWriter.Class
-    Reflex.Class
-    Reflex.Collection
-    Reflex.Dom.Builder.Class
-    Reflex.Dom.Builder.Class.Events
-    Reflex.Dom.Builder.Hydratable
-    Reflex.Dom.Builder.Immediate
-    Reflex.Dom.Builder.InputDisabled
-    Reflex.Dom.Builder.Static
-    Reflex.Dom.Class
-    Reflex.Dom.Core
-    Reflex.Dom.Location
-    Reflex.Dom.Main
-    Reflex.Dom.Modals.Class
-    Reflex.Dom.Old
-    Reflex.Dom.Prerender
-    Reflex.Dom.WebSocket
-    Reflex.Dom.WebSocket.Foreign
-    Reflex.Dom.Widget
-    Reflex.Dom.Widget.Basic
-    Reflex.Dom.Widget.Input
-    Reflex.Dom.Widget.Lazy
-    Reflex.Dom.Widget.Resize
-    Reflex.Dom.Xhr
-    Reflex.Dom.Xhr.Exception
-    Reflex.Dom.Xhr.Foreign
-    Reflex.Dom.Xhr.FormData
-    Reflex.Dom.Xhr.ResponseType
-    Reflex.Dynamic
-    Reflex.Dynamic.Uniq
-    Reflex.DynamicWriter.Base
-    Reflex.DynamicWriter.Class
-    Reflex.EventWriter.Base
-    Reflex.EventWriter.Class
-    Reflex.FastWeak
-    Reflex.FunctorMaybe
-    Reflex.Host.Class
-    Reflex.Network
-    Reflex.NotReady.Class
-    Reflex.PerformEvent.Base
-    Reflex.PerformEvent.Class
-    Reflex.PostBuild.Base
-    Reflex.PostBuild.Class
-    Reflex.Profiled
-    Reflex.Query.Base
-    Reflex.Query.Class
-    Reflex.Requester.Base
-    Reflex.Requester.Class
-    Reflex.Spider
-    Reflex.Spider.Internal
-    Reflex.Spider.NodeInfo
-    Reflex.Spider.NodeInfo.Normal
-    Reflex.Spider.Ref
-    Reflex.Spider.Ref.Normal
-    Reflex.Time
-    Reflex.TriggerEvent.Base
-    Reflex.TriggerEvent.Class
-    Reflex.Workflow
-    Foreign.JavaScript.Internal.Utils
+    Reflex.React
+    Example.SimpleProps
+    Example.SimpleState
 
   build-depends:    base
 --                  , reflex-react --TODO: Split into a library
---                  , reflex-dom-core
---                  , reflex
---                  , jsaddle
---                  , jsaddle-dom
---                  , jsaddle-warp
---                  , ghcjs-dom
-                  , ghc-heap
-                  , ghc-heap-view
+                  , reflex-dom-core
+                  , reflex
+                  , jsaddle
+                  , jsaddle-dom
+                  , ghcjs-dom
                   , text
                   , containers
                   , mtl
-                  , websockets
                   , deepseq
                   , aeson
                   , scientific
@@ -161,47 +47,26 @@ executable reflex-react
                   , http-types
                   , entropy
                   , base64-bytestring
-                  , wai
-                  , wai-websockets
-                  , warp
+                  , witherable
                   , foreign-store
                   , dependent-sum
-                  , these
-                  , patch
-                  , semialign
-                  , base-compat-batteries
-                  , dependent-map
-                  , witherable
-                  , semigroupoids
-                  , data-default
-                  , monoidal-containers
-                  , commutative-semigroups
-                  , exception-transformers
-                  , time
-                  , unbounded-delays
-                  , random
-                  , prim-uniq
-                  , constraints
-                  , mmorph
-                  , monad-control
-                  , keycode
-                  , case-insensitive
                   , reflection
-                  , profunctors
-                  , blaze-builder
-                  , network-uri
-                  , bimap
   hs-source-dirs:
     src
     src-exe
-    dep/reflex/src
-    dep/reflex-dom/reflex-dom-core/src
-    dep/reflex-dom/reflex-dom-core/src-ghc
-    dep/jsaddle/jsaddle/src
-    dep/jsaddle/jsaddle/src-ghc
-    dep/jsaddle/jsaddle-warp/src
-    dep/jsaddle-dom/src
-    dep/jsaddle-dom/src-ghc
-    dep/ghcjs-dom/ghcjs-dom-jsaddle/src
+
+  if impl(ghcjs)
+    build-depends: ghcjs-base == 0.2.*
+                  , ghcjs-prim
+                  -- This is to allow the hashable patches to work
+                  -- the hashable should to be pinned in reflex-platform
+                  , hashable == 1.3.5.0
+  else
+    build-depends: websockets
+                  , wai
+                  , wai-websockets
+                  , warp
+                  , jsaddle-warp
+
   default-language: Haskell2010
   ghc-options: -threaded -with-rtsopts=-N10
