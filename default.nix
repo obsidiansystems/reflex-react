@@ -7,7 +7,6 @@
   compiler-nix-name = "ghc8107Splices"; #TODO: This must be default
   shells = ps: with ps; [ reflex-react ];
   inputThunks = [
-    ./dep/react-haskell
     {
       thunk = ./dep/jsaddle;
       subdirs = [
@@ -23,6 +22,7 @@
       ];
     }
     ./dep/jsaddle-dom
+    ./dep/reflex
   ];
   overrides = [
     ({ config, pkgs, lib, ... }: {
