@@ -5,7 +5,6 @@ import { useState, useMemo, useCallback, Suspense } from 'react';
 
 export default function Test() {
   const [v, setV] = useState(0);
-  const e = useMemo(() => document.createElement("input"))
   return (
     <WithHaskell fallback={<i>Loading Haskell...</i>}>
       <button onClick={() => setV((old) => old+1)}>Increment</button>
