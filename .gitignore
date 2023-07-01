@@ -1,2 +1,5 @@
 dist-newstyle
 result
+tags
+TAGS
+cabal.project.local
