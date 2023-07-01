@@ -48,10 +48,11 @@ type DomCoreWidget' x js = PostBuildT (SpiderTimeline x) (WithJSContextSingleton
 -- | Turn a Reflex widget into a React component.  It receives `props` from its parent component as a Dynamic JSVal.
 reflexComponent
   :: forall props
-  .  (JSVal -> JSM props)
+  .  Tag
+  -> (JSVal -> JSM props)
   -> (forall x. Given (SpiderTimeline x) => Dynamic (SpiderTimeline x) props -> Widget' x () ())
   -> ReaderT React JSM (Component JSVal ())
-reflexComponent decodeProps w = component $ do
+reflexComponent elemTag decodeProps w = component $ do
   propUpdaterRef <- useRef jsNull
   initialPropsRef <- useRef jsNull
   instantiateWidget <- flip useCallback (Just []) $ \_ _ [eVal] -> withJSContextSingletonMono $ \jsSing -> do
@@ -107,7 +108,7 @@ reflexComponent decodeProps w = component $ do
       False -> do
         _ <- lift $ call propUpdater nullObject [props]
         pure ()
-    pure $ createElement "div" ("ref" =: instantiateWidget) ["test"]
+    pure $ createElement elemTag ("ref" =: instantiateWidget) [] --TODO: When this `div` is not allowed to be here, the whole app hangs.  The hang is caused by incorrect error handling in jsaddle (it *should* throw instead), but there is also a weird interaction in which React tries to re-run the rendering function, but, the second time, it gets a "dispatcher is null" exception.  This appears to happen while React is trying to display the warning.
 
 {-# INLINABLE attachImmediateWidget' #-}
 attachImmediateWidget'
