@@ -32,11 +32,11 @@ export function useHaskell() {
  */
 export function loadHaskellEngine() {
   return new Promise((resolve, reject) => {
-    const jsaddleRoot = "http://localhost:3001";
+    const jsaddleRoot = "http://localhost:3000";
     const xhr = new XMLHttpRequest();
-    xhr.open("GET", jsaddleRoot + "/jsaddle.js");
+    xhr.open("GET", jsaddleRoot + "/haskell-all.js");
     xhr.onload = () => {
-      eval("(function(JSADDLE_ROOT, arg) {" + xhr.response + "})")(jsaddleRoot, { react: react, setVal: resolve });
+      eval("(function(JSADDLE_ROOT, arg, global) { function getProgramArg() { return arg; };" + xhr.response + "})")(jsaddleRoot, { react: react, setVal: resolve }, window);
     };
     //TODO: xhr.onerror
     xhr.send();

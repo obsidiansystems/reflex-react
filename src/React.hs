@@ -9,6 +9,7 @@ module React where
 
 import Prelude hiding ((!!))
 
+import Data.Coerce (coerce)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
