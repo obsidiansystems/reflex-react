@@ -1,6 +1,5 @@
 'use client';
 
-import { WithHaskell, HaskellComponent } from './Haskell'
 import { useState, useMemo, useCallback, Suspense } from 'react';
 import { SimplePropsTypescript, SimplePropsHaskell, SimplePropsReflex } from './SimpleProps';
 import { SimpleStateTypescript, SimpleStateHaskell, SimpleStateReflex } from './SimpleState';
@@ -8,7 +7,7 @@ import { SimpleStateTypescript, SimpleStateHaskell, SimpleStateReflex } from './
 export default function Test() {
   const [v, setV] = useState(0);
   return (
-    <WithHaskell moduleUrl="/haskell-all.js" fallback={<i>Loading...</i>}>
+    <>
       <h1>Simple Props</h1>
       v: <input type="number" value={v.toString()} onChange={e => setV(Number(e.target.value))} />
       <h2>Typescript</h2>
@@ -25,6 +24,6 @@ export default function Test() {
       <div><SimpleStateHaskell v={v} /></div>
       <h2>Reflex</h2>
       <div><SimpleStateReflex v={v} /></div>
-    </WithHaskell>
+    </>
   )
 }

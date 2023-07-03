@@ -3,6 +3,8 @@
 import { useProps } from 'react';
 import { ImportHaskellComponent } from './Haskell';
 
+import { default as haskell } from './haskell-app/reflex-react.cabal';
+
 export function SimplePropsTypescript(props) {
   return (
     <>
@@ -11,6 +13,6 @@ export function SimplePropsTypescript(props) {
   );
 }
 
-export const SimplePropsHaskell = ImportHaskellComponent('simplePropsHaskell');
+export const SimplePropsHaskell = haskell.simplePropsHaskell;
 
-export const SimplePropsReflex = ImportHaskellComponent('simplePropsReflex');
+export const SimplePropsReflex = haskell.simplePropsReflex;

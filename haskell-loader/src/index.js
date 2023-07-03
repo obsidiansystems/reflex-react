@@ -11,12 +11,12 @@ module.exports = function(source) {
 
   let result;
   try {
-    this.cacheable(false);
     if (options.dev) {
       if (options.isServer) {
         // no-op
         result = 'export function haskellEngine(arg, global) { };';
       } else { // !options.isServer
+        this.cacheable(false);
         const command = 'ghcid -r -W -c"cabal repl ' + path.basename(cabalFilePath) + '"';
         const ghcid_process = child_process.spawn(
           'nix-shell',
@@ -33,27 +33,24 @@ module.exports = function(source) {
         // TODO: we should ideally wait for the ghcid to successfully start the jsaddle server
 
         //TODO: xhr.onerror
-        const evalJSaddleJs =
-              'new Promise((resolve, reject) => {' +
-              '  const jsaddleRoot = "http://localhost:3001";' +
-              '  const xhr = new XMLHttpRequest();' +
-              '  xhr.open("GET", jsaddleRoot + "/jsaddle.js");' +
-              '  xhr.onload = () => {' +
-              '    eval("(function(JSADDLE_ROOT, arg) {" + xhr.response + "})")(jsaddleRoot, arg);' +
-              '  };' +
-              '  xhr.send();' +
-              '})';
-
-        result = 'export function haskellEngine(arg, global) { ' +
-          'var doXhr = ' + evalJSaddleJs + ';' +
-          'doXhr;' +
-          '};';
+        result =
+          'import * as react from "react";' +
+          'console.log("retrieving jsaddle.js");' +
+          'const jsaddleRoot = "http://localhost:3001";' +
+          'const xhr = new XMLHttpRequest();' +
+          'xhr.open("GET", jsaddleRoot + "/jsaddle.js");' +
+          'var result;' +
+          'xhr.onload = () => {' +
+          '  eval("(function(JSADDLE_ROOT, arg, global) {" + xhr.response + "})")(jsaddleRoot, { react, setVal: (v) => { result = v; } }, window);' +
+          '};' +
+          'xhr.send();';
       }
     } else {  // !options.dev
       if(options.isServer) {
         // no-op
         result = '';
       } else {
+        //TODO: Correctly report dependencies
         const build_command = 'js-unknown-ghcjs-cabal build ' + path.basename(cabalFilePath);
         const build_result = child_process.spawnSync(
           'nix-shell',
@@ -92,11 +89,14 @@ module.exports = function(source) {
         const out_dir = last_line.split(': createProcess:')[0] + '.jsexe';
 
         const allJs = readFileSync(out_dir + '/all.js');
+
         var numReplacements = 0;
+        // Make main start in sync mode.  This way, our components will be available as soon as the js-side `import` function finishes.
         const syncMainJs = allJs.toString().replace(/\nh\$main(.*);\n/, (_, closureName) => { numReplacements++; return '\nh$runSync(' + closureName + ', false);\nh$startMainLoop();\n'; });
         if(numReplacements !== 1) {
           throw Error('Expected to find one h$main invocation in all.js, but found ' + numReplacements.toString());
         }
+
         result = "import * as react from 'react'; function haskellEngine(arg, global) { function getProgramArg() { return arg; };" + syncMainJs + "}; var result; haskellEngine({ react, setVal: (v) => { result = v; } }, window); export default result;";
       }
     }
