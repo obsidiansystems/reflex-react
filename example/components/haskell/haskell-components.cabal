@@ -1,5 +1,5 @@
 cabal-version:      3.0
-name:               reflex-react
+name:               haskell-components
 version:            0.1.0.0
 license:            BSD-3-Clause
 license-file:       LICENSE
@@ -16,13 +16,12 @@ executable reflex-react
   import:           warnings
   main-is:          Main.hs
   other-modules:
-    React
-    Reflex.React
     Example.SimpleProps
     Example.SimpleState
 
   build-depends:    base
---                  , reflex-react --TODO: Split into a library
+                  , react
+                  , reflex-react
                   , reflex-dom-core
                   , reflex
                   , jsaddle
@@ -70,5 +69,3 @@ executable reflex-react
 
   default-language: Haskell2010
   ghc-options: -threaded -with-rtsopts=-N10
-
-  

@@ -12,17 +12,13 @@ extra-doc-files:    CHANGELOG.md
 common warnings
     ghc-options: -Wall
 
-executable reflex-react
+library
   import:           warnings
-  main-is:          Main.hs
-  other-modules:
-    React
+  exposed-modules:
     Reflex.React
-    Example.SimpleProps
-    Example.SimpleState
 
   build-depends:    base
---                  , reflex-react --TODO: Split into a library
+                  , react
                   , reflex-dom-core
                   , reflex
                   , jsaddle
@@ -69,6 +65,3 @@ executable reflex-react
                   , jsaddle-warp
 
   default-language: Haskell2010
-  ghc-options: -threaded -with-rtsopts=-N10
-
-  

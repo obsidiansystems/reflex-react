@@ -3,7 +3,7 @@
 import { useProps } from 'react';
 import { ImportHaskellComponent } from './Haskell';
 
-import { default as haskell } from './haskell-app/reflex-react.cabal';
+import { default as haskell } from './haskell/haskell-components.cabal';
 
 export function SimplePropsTypescript(props) {
   return (

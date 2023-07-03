@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ImportHaskellComponent } from './Haskell';
 
-import { default as haskell } from './haskell-app/reflex-react.cabal';
+import { default as haskell } from './haskell/haskell-components.cabal';
 
 export function SimpleStateTypescript() {
   const [v, setV] = useState(0);

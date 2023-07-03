@@ -1,4 +1,7 @@
-packages: .
+packages:
+  react
+  reflex-react
+  example/components/haskell
 allow-newer:
   react-haskell:void,
   ghcjs-base,
