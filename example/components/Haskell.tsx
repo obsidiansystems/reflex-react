@@ -4,7 +4,7 @@
 import * as react from 'react';
 import { createElement, createContext, useRef, useEffect, useState, Suspense, useContext } from 'react';
 
-import { haskellEngine } from './test.cabal';
+import { haskellEngine } from './haskell-app/reflex-react.cabal';
 
 /**
  * A React Context that holds a Promise that yields a Haskell engine.  If this is null, that means no ancestor component is providing thix Context.
