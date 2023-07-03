@@ -4,7 +4,7 @@
 import * as react from 'react';
 import { createElement, createContext, useRef, useEffect, useState, Suspense, useContext } from 'react';
 
-import {} from './test.cabal';
+import { haskellEngine } from './test.cabal';
 
 /**
  * A React Context that holds a Promise that yields a Haskell engine.  If this is null, that means no ancestor component is providing thix Context.
@@ -35,14 +35,7 @@ export function useHaskell() {
  */
 export function loadHaskellEngine(moduleUrl: URL) {
   return new Promise((resolve, reject) => {
-    const haskellJsRoot = `${moduleUrl.protocol}//${moduleUrl.hostname}${moduleUrl.port ? ':' + moduleUrl.port : ''}`;
-    const xhr = new XMLHttpRequest();
-    xhr.open("GET", moduleUrl);
-    xhr.onload = () => {
-      eval("(function(JSADDLE_ROOT, arg, global) { function getProgramArg() { return arg; };" + xhr.response + "})")(haskellJsRoot, { react: react, setVal: resolve }, window);
-    };
-    //TODO: xhr.onerror
-    xhr.send();
+    haskellEngine({ react: react, setVal: resolve }, window);
   })
 }
 
