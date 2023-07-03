@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, Suspense } from 'react';
+import { useState } from 'react';
 import { SimplePropsTypescript, SimplePropsHaskell, SimplePropsReflex } from './SimpleProps';
 import { SimpleStateTypescript, SimpleStateHaskell, SimpleStateReflex } from './SimpleState';
 
