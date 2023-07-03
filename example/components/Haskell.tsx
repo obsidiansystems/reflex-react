@@ -4,7 +4,7 @@
 import * as react from 'react';
 import { createElement, createContext, useRef, useEffect, useState, Suspense, useContext } from 'react';
 
-import { haskellEngine } from './haskell-app/reflex-react.cabal';
+import { default as result } from './haskell-app/reflex-react.cabal';
 
 /**
  * A React Context that holds a Promise that yields a Haskell engine.  If this is null, that means no ancestor component is providing thix Context.
@@ -72,14 +72,14 @@ export function useLoadHaskellEngine(moduleUrl: URL) {
  * You may provide a `fallback` prop to this component to display while children are not ready (whether they are not ready because of the Haskell engine or any other reason).
  */
 export function WithHaskell({moduleUrl, fallback, children}) {
-  const engineLoaded = useLoadHaskellEngine(moduleUrl);
+  // const engineLoaded = useLoadHaskellEngine(moduleUrl);
 
   // Note that we must include Suspense here, otherwise our
   // `useLoadHaskellEngine` will be continuously retried instead
   // of being allowed to finish
   return (
     <Suspense fallback={fallback}>
-      <HaskellContext.Provider value={engineLoaded}>
+      <HaskellContext.Provider value={{ready: true, val: result}}>
         {children}
       </HaskellContext.Provider>
     </Suspense>

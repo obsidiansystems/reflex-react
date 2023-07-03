@@ -49,12 +49,11 @@ main = exportToJS $ sequence $ Map.fromList
   ]
 
 exportToJS :: ReaderT React JSM (Map Text JSVal) -> IO ()
-exportToJS build = do
-  runJS $ \arg -> do
-    react <- fmap (React . Object) $ arg ! t "react"
-    m <- flip runReaderT react build
-    _ <- (arg # t "setVal") [m]
-    pure ()
+exportToJS build = runJS $ \arg -> do
+  react <- fmap (React . Object) $ arg ! t "react"
+  m <- flip runReaderT react build
+  _ <- (arg # t "setVal") [m]
+  pure ()
 
 runJS :: (JSVal -> JSM ()) -> IO ()
 

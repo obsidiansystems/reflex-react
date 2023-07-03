@@ -5,15 +5,15 @@ const readFileSync = require('fs').readFileSync;
 module.exports = function(source) {
   const options = this.getOptions();
   const callback = this.async();
-  const cabalFilePath = this.resourcePath;
+  const cabalFilePath = path.resolve(this.resourcePath);
   const cabalFileDir = path.dirname(cabalFilePath);
 
 
   let result;
   try {
+    this.cacheable(false);
     if (options.dev) {
       if (options.isServer) {
-        this.cacheable(false);
         // no-op
         result = 'export function haskellEngine(arg, global) { };';
       } else { // !options.isServer
@@ -92,7 +92,12 @@ module.exports = function(source) {
         const out_dir = last_line.split(': createProcess:')[0] + '.jsexe';
 
         const allJs = readFileSync(out_dir + '/all.js');
-        result = "export function haskellEngine(arg, global) { function getProgramArg() { return arg; };" + allJs + "};";
+        var numReplacements = 0;
+        const syncMainJs = allJs.toString().replace(/\nh\$main(.*);\n/, (_, closureName) => { numReplacements++; return '\nh$runSync(' + closureName + ', false);\nh$startMainLoop();\n'; });
+        if(numReplacements !== 1) {
+          throw Error('Expected to find one h$main invocation in all.js, but found ' + numReplacements.toString());
+        }
+        result = "import * as react from 'react'; function haskellEngine(arg, global) { function getProgramArg() { return arg; };" + syncMainJs + "}; var result; haskellEngine({ react, setVal: (v) => { result = v; } }, window); export default result;";
       }
     }
   } catch (error) {

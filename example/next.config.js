@@ -14,7 +14,7 @@ const nextConfig = {
       use: [
         {
           loader: `haskell-loader`,
-          options: { dev, isServer},
+          options: { dev: false, isServer },
         }
       ],
     });

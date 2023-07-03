@@ -70,3 +70,5 @@ executable reflex-react
 
   default-language: Haskell2010
   ghc-options: -threaded -with-rtsopts=-N10
+
+  
