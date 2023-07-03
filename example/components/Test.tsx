@@ -8,7 +8,7 @@ import { SimpleStateTypescript, SimpleStateHaskell, SimpleStateReflex } from './
 export default function Test() {
   const [v, setV] = useState(0);
   return (
-    <WithHaskell fallback={<i>Loading...</i>}>
+    <WithHaskell moduleUrl="/haskell-all.js" fallback={<i>Loading...</i>}>
       <h1>Simple Props</h1>
       v: <input type="number" value={v.toString()} onChange={e => setV(Number(e.target.value))} />
       <h2>Typescript</h2>

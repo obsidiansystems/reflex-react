@@ -4,6 +4,8 @@
 import * as react from 'react';
 import { createElement, createContext, useRef, useEffect, useState, Suspense, useContext } from 'react';
 
+import {} from './test.cabal';
+
 /**
  * A React Context that holds a Promise that yields a Haskell engine.  If this is null, that means no ancestor component is providing thix Context.
  */
@@ -28,15 +30,16 @@ export function useHaskell() {
 /**
  * Initialize a new Haskell engine.  Generally, you only need one of these per app.  This function does not do anything with React; for a hook that invokes this function, use `useLoadHaskellEngine`.
  *
+ * @param {URL} moduleUrl - A URL from which the built Haskell or JSaddle stub JS can be loaded
  * @returns {Promise<Object>} A promise that yields the loaded Haskell engine
  */
-export function loadHaskellEngine() {
+export function loadHaskellEngine(moduleUrl: URL) {
   return new Promise((resolve, reject) => {
-    const jsaddleRoot = "http://localhost:3000";
+    const haskellJsRoot = `${moduleUrl.protocol}//${moduleUrl.hostname}${moduleUrl.port ? ':' + moduleUrl.port : ''}`;
     const xhr = new XMLHttpRequest();
-    xhr.open("GET", jsaddleRoot + "/haskell-all.js");
+    xhr.open("GET", moduleUrl);
     xhr.onload = () => {
-      eval("(function(JSADDLE_ROOT, arg, global) { function getProgramArg() { return arg; };" + xhr.response + "})")(jsaddleRoot, { react: react, setVal: resolve }, window);
+      eval("(function(JSADDLE_ROOT, arg, global) { function getProgramArg() { return arg; };" + xhr.response + "})")(haskellJsRoot, { react: react, setVal: resolve }, window);
     };
     //TODO: xhr.onerror
     xhr.send();
@@ -48,7 +51,7 @@ export function loadHaskellEngine() {
  *
  * @returns {Promise<Object>} When the Haskell engine has finished loading, the Promise provides an Object with all of its exported values.
  */
-export function useLoadHaskellEngine() {
+export function useLoadHaskellEngine(moduleUrl: URL) {
   // {ryantrinkle} This seems overly-complicated to me, but I don't know how to do better.  I want to create this Promise only once and return it synchronously.  useMemo doesn't guarantee only-once, useEffect doesn't return any value synchronously, and useRef doesn't accept an initializer function (only a value, so it must be pointlessly reconstructed each time).  useState seems to have the right semantics, so we just ignore the setter function, since we don't need it.
   const [[engineLoaded, resolveEngineLoaded], _] = useState(() => {
     var resolveEngineLoadedInner;
@@ -63,7 +66,7 @@ export function useLoadHaskellEngine() {
     return [engineLoadedInner, resolveEngineLoadedInner];
   });
   useEffect(() => {
-    loadHaskellEngine().then(resolveEngineLoaded);
+    loadHaskellEngine(moduleUrl).then(resolveEngineLoaded);
   }, []);
   return engineLoaded;
 }
@@ -75,8 +78,8 @@ export function useLoadHaskellEngine() {
  *
  * You may provide a `fallback` prop to this component to display while children are not ready (whether they are not ready because of the Haskell engine or any other reason).
  */
-export function WithHaskell({children, fallback}) {
-  const engineLoaded = useLoadHaskellEngine();
+export function WithHaskell({moduleUrl, fallback, children}) {
+  const engineLoaded = useLoadHaskellEngine(moduleUrl);
 
   // Note that we must include Suspense here, otherwise our
   // `useLoadHaskellEngine` will be continuously retried instead
