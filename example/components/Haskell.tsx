@@ -60,7 +60,7 @@ export function useLoadHaskellEngine(moduleUrl: URL) {
   });
   useEffect(() => {
     loadHaskellEngine(moduleUrl).then(resolveEngineLoaded);
-  }, []);
+  }, [moduleUrl, resolveEngineLoaded]);
   return engineLoaded;
 }
 
