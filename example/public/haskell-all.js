@@ -1,1 +1,0 @@
-../../dist-newstyle/build/js-ghcjs/ghcjs-8.10.7/reflex-react-0.1.0.0/x/reflex-react/build/reflex-react/reflex-react.jsexe/all.js

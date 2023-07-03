@@ -1,22 +1,12 @@
-packages:
-  react
-  reflex-react
-  example/components/haskell
+packages: .
 allow-newer:
-  react-haskell:void,
   ghcjs-base,
   aeson,
   attoparsec,
   lens
 
-packages react-haskell
-  flags: +ghcjs
-  build-depends: ghcjs-dom,
-                 ghcjs-base
-
 package reflex-dom
   flags: -webkit2gtk
-
 
 constraints:
   --TODO: This should be pinned in reflex-platform

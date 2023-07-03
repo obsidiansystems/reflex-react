@@ -23,11 +23,7 @@
     }
     ./dep/jsaddle-dom
     ./dep/reflex
-  ];
-  overrides = [
-    ({ config, pkgs, lib, ... }: {
-
-    })
+    ./dep/react
   ];
 })).extend (self: super: {
   shells = super.shells // {
