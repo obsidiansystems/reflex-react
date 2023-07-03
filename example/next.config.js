@@ -3,19 +3,21 @@ const path = require('path');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   webpack: (config, options) => {
+    const { dev, isServer } = options;
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
       child_process: false
     };
     config.module.rules.push({
-      test: /\.cabal/,
+      test: /\.(cabal)$/,
       use: [
         {
-          loader: path.resolve('./loaders/haskell.js'),
+          loader: `haskell-loader`,
+          options: { dev, isServer},
         }
       ],
-    })
+    });
 
     return config;
   },
