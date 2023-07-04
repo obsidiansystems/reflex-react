@@ -52,7 +52,7 @@ reflexComponent
   -> (JSVal -> JSM props)
   -> (forall x. Given (SpiderTimeline x) => Dynamic (SpiderTimeline x) props -> Widget' x () ())
   -> ReaderT React JSM (Component JSVal ())
-reflexComponent elemTag decodeProps w = component $ do
+reflexComponent elemTag decodeProps w = component $ \props -> do
   propUpdaterRef <- useRef jsNull
   initialPropsRef <- useRef jsNull
   instantiateWidget <- flip useCallback (Just []) $ \_ _ [eVal] -> withJSContextSingletonMono $ \jsSing -> do
@@ -64,7 +64,7 @@ reflexComponent elemTag decodeProps w = component $ do
         initialProps <- decodeProps =<< (initialPropsRef ! t "current")
         propUpdaterJSM <- liftIO $ withSpiderTimeline $ \(timeline :: SpiderTimeline x) -> do
           (gotProps, gotPropsTriggerRef) <- flip runSpiderHostForTimeline timeline newEventWithTriggerRef
-          props <- flip runSpiderHostForTimeline timeline $ holdDyn initialProps gotProps
+          innerProps <- flip runSpiderHostForTimeline timeline $ holdDyn initialProps gotProps
           (events :: Chan [DSum (EventTriggerRef (SpiderTimeline x)) TriggerInvocation], fc) <- attachImmediateWidget' timeline $ \hydrationMode events -> do
             (postBuild, postBuildTriggerRef) <- newEventWithTriggerRef
             let go :: DOM.DocumentFragment -> FloatingWidget' x () ()
@@ -80,7 +80,7 @@ reflexComponent elemTag decodeProps w = component $ do
                         , _hydrationDomBuilderEnv_switchover = never
                         , _hydrationDomBuilderEnv_delayed = delayed
                         }
-                  lift $ runHydrationDomBuilderT (w props) builderEnv events
+                  lift $ runHydrationDomBuilderT (w innerProps) builderEnv events
             --TODO: Now that we've stopped firefox from processing things while blocked on XHR, we have the problem that re-entering JS from a `liftIO` doesn't work: it blocks because it shouldn't be running inside that synchronous block, but nevertheless it is.
             runWithJSContextSingleton (runPostBuildT (runTriggerEventT (go eFragment) events) postBuild) jsSing
             return (events, postBuildTriggerRef)
@@ -92,23 +92,22 @@ reflexComponent elemTag decodeProps w = component $ do
               forM_ mGotPropsTrigger $ \gotPropsTrigger -> case fc of
                 FireCommand fire -> flip runSpiderHostForTimeline timeline $ do
                   fire [gotPropsTrigger :=> Identity newProps] $ return ()
-        Function' _ propUpdater <- function' $ \_ _ [props] -> do
-          propUpdaterJSM props
+        Function' _ propUpdater <- function' $ \_ _ [updaterProps] -> do
+          propUpdaterJSM updaterProps
           pure jsUndefined
         propUpdaterRef <# t "current" $ propUpdater
         initialPropsRef <# t "current" $ jsNull
         replaceElementContents e eFragment
     pure jsUndefined
-  pure $ \props -> Render $ do
-    propUpdater <- lift $ propUpdaterRef ! t "current"
-    propUpdaterIsNull <- lift $ valIsNull propUpdater
-    case propUpdaterIsNull of
-      True -> do
-        lift $ initialPropsRef <# t "current" $ props
-      False -> do
-        _ <- lift $ call propUpdater nullObject [props]
-        pure ()
-    pure $ createElement elemTag ("ref" =: instantiateWidget) [] --TODO: When this `div` is not allowed to be here, the whole app hangs.  The hang is caused by incorrect error handling in jsaddle (it *should* throw instead), but there is also a weird interaction in which React tries to re-run the rendering function, but, the second time, it gets a "dispatcher is null" exception.  This appears to happen while React is trying to display the warning.
+  propUpdater <- liftJSM $ propUpdaterRef ! t "current"
+  propUpdaterIsNull <- liftJSM $ valIsNull propUpdater
+  case propUpdaterIsNull of
+    True -> do
+      liftJSM $ initialPropsRef <# t "current" $ props
+    False -> do
+      _ <- liftJSM $ call propUpdater nullObject [props]
+      pure ()
+  pure $ createElement elemTag ("ref" =: instantiateWidget) [] --TODO: When this `div` is not allowed to be here, the whole app hangs.  The hang is caused by incorrect error handling in jsaddle (it *should* throw instead), but there is also a weird interaction in which React tries to re-run the rendering function, but, the second time, it gets a "dispatcher is null" exception.  This appears to happen while React is trying to display the warning.
 
 {-# INLINABLE attachImmediateWidget' #-}
 attachImmediateWidget'
