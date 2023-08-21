@@ -8,6 +8,11 @@ maintainer:         maintainer@obsidian.systems
 category:           Web
 build-type:         Simple
 extra-doc-files:    CHANGELOG.md
+synopsis:           Create React components with Reflex
+description:
+  This library provides bindings to React that allow you to write components
+  with Reflex.  Typically, these components will be compiled with GHCJS to
+  produce JavaScript for inclusion in a React application.
 
 common warnings
     ghc-options: -Wall
